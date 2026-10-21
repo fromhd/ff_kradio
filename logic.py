@@ -362,10 +362,8 @@ class Logic(PluginModuleBase):
         for ch in all_base:
             if ch.get("id") in disabled_set:
                 continue
+            # Keep original logo string for base channels (KRadio app has them built into APK assets)
             item = copy.deepcopy(ch)
-            raw_logo = (item.get("logo") or "").strip()
-            if raw_logo and not (raw_logo.startswith("http://") or raw_logo.startswith("https://")):
-                item["logo"] = f"{ddns}/ff_kradio/logo/{raw_logo}"
             base_channels.append(item)
 
         # 2. Custom channels
