@@ -1,0 +1,211 @@
+{
+  "version": 2,
+  "latestVersionCode": 22,
+  "latestVersionName": "1.10.1",
+  "headerSets": {
+    "kbs": {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36",
+      "Referer": "https://onair.kbs.co.kr/"
+    },
+    "sbs": {
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_16_0) AppleWebKit/537.36 (KHTML, like Gecko) GOREALRA/1.2.1 Chrome/85.0.4183.121 Electron/10.1.3 Safari/537.36",
+      "Origin": "https://gorealraplayer.radio.sbs.co.kr",
+      "Referer": "https://gorealraplayer.radio.sbs.co.kr/main.html?v=1.2.1"
+    },
+    "mbc": {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36",
+      "Referer": "http://mini.imbc.com/"
+    }
+  },
+  "channels": [
+    {
+      "id": "kbs_1radio",
+      "name": "KBS 1라디오",
+      "group": "KBS",
+      "type": "api",
+      "headers": "kbs",
+      "epg": "815455.naver",
+      "logo": "kbs1.png",
+      "api": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/21",
+      "extract": {
+        "json": "channel_item[media_type=radio].service_url"
+      }
+    },
+    {
+      "id": "kbs_happy",
+      "name": "KBS 해피FM",
+      "group": "KBS",
+      "type": "api",
+      "headers": "kbs",
+      "epg": "815458.naver",
+      "logo": "kbs_happy.png",
+      "api": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/22",
+      "extract": {
+        "json": "channel_item[media_type=radio].service_url"
+      }
+    },
+    {
+      "id": "kbs_3radio",
+      "name": "KBS 3라디오",
+      "group": "KBS",
+      "type": "api",
+      "headers": "kbs",
+      "epg": "815460.naver",
+      "logo": "kbs3.png",
+      "api": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/23",
+      "extract": {
+        "json": "channel_item[media_type=radio].service_url"
+      }
+    },
+    {
+      "id": "kbs_classic",
+      "name": "KBS 클래식FM",
+      "group": "KBS",
+      "type": "api",
+      "headers": "kbs",
+      "epg": "815454.naver",
+      "logo": "kbs_classic.png",
+      "api": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/24",
+      "extract": {
+        "json": "channel_item[media_type=radio].service_url"
+      }
+    },
+    {
+      "id": "kbs_cool",
+      "name": "KBS 쿨FM",
+      "group": "KBS",
+      "type": "api",
+      "headers": "kbs",
+      "epg": "815457.naver",
+      "logo": "kbs_cool.png",
+      "api": "https://cfpwwwapi.kbs.co.kr/api/v1/landing/live/channel_code/25",
+      "extract": {
+        "json": "channel_item[media_type=radio].service_url"
+      }
+    },
+    {
+      "id": "mbc_fm",
+      "name": "MBC 표준FM",
+      "group": "MBC",
+      "type": "api",
+      "headers": "mbc",
+      "epg": "815464.naver",
+      "logo": "mbc_fm.png",
+      "api": "https://sminiplay.imbc.com/aacplay.ashx?agent=webapp&channel=sfm&callback=jarvis.miniInfo.loadOnAirComplete",
+      "extract": {
+        "regex": "(https?://[^\"']+\\.m3u8[^\"']*)"
+      }
+    },
+    {
+      "id": "mbc_fm4u",
+      "name": "MBC FM4U",
+      "group": "MBC",
+      "type": "api",
+      "headers": "mbc",
+      "epg": "815463.naver",
+      "logo": "mbc_fm4u.png",
+      "api": "https://sminiplay.imbc.com/aacplay.ashx?agent=webapp&channel=mfm&callback=jarvis.miniInfo.loadOnAirComplete",
+      "extract": {
+        "regex": "(https?://[^\"']+\\.m3u8[^\"']*)"
+      }
+    },
+    {
+      "id": "sbs_power",
+      "name": "SBS 파워FM",
+      "group": "SBS",
+      "type": "api",
+      "headers": "sbs",
+      "epg": "815467.naver",
+      "logo": "sbs_power.png",
+      "api": "https://apis.sbs.co.kr/play-api/1.0/livestream/powerpc/powerfm?protocol=hls&ssl=Y",
+      "extract": {
+        "regex": "(https?://[^\"']+\\.m3u8[^\"']*)"
+      }
+    },
+    {
+      "id": "sbs_love",
+      "name": "SBS 러브FM",
+      "group": "SBS",
+      "type": "api",
+      "headers": "sbs",
+      "epg": "815465.naver",
+      "logo": "sbs_love.png",
+      "api": "https://apis.sbs.co.kr/play-api/1.0/livestream/lovepc/lovefm?protocol=hls&ssl=Y",
+      "extract": {
+        "regex": "(https?://[^\"']+\\.m3u8[^\"']*)"
+      }
+    },
+    {
+      "id": "cbs_music_fm",
+      "name": "CBS 음악FM",
+      "group": "기타",
+      "type": "direct",
+      "epg": "815449.naver",
+      "logo": "cbs_music.png",
+      "url": "http://m-aac.cbs.co.kr/cbs939/_definst_/cbs939.stream/playlist.m3u8"
+    },
+    {
+      "id": "cbs_fm",
+      "name": "CBS 표준FM",
+      "group": "기타",
+      "type": "direct",
+      "epg": "815451.naver",
+      "logo": "cbs.png",
+      "url": "http://m-aac.cbs.co.kr/cbs981/_definst_/cbs981.stream/playlist.m3u8"
+    },
+    {
+      "id": "ebsfm",
+      "name": "EBS FM",
+      "group": "기타",
+      "type": "direct",
+      "epg": "815452.naver",
+      "logo": "ebs_fm.png",
+      "url": "https://ebsonair.ebs.co.kr/fmradiofamilypc/familypc1m/playlist.m3u8"
+    },
+    {
+      "id": "ytn",
+      "name": "YTN 라디오",
+      "group": "기타",
+      "type": "direct",
+      "epg": "2074615.naver",
+      "logo": "ytn.png",
+      "url": "https://radiolive.ytn.co.kr/radio/_definst_/20211118_fmlive/playlist.m3u8"
+    },
+    {
+      "id": "tbsfm",
+      "name": "TBS FM",
+      "group": "기타",
+      "type": "direct",
+      "epg": "815468.naver",
+      "logo": "tbs.png",
+      "url": "https://cdnfm.tbs.seoul.kr/tbs/_definst_/tbs_fm_web_360.smil/playlist.m3u8"
+    },
+    {
+      "id": "tbnfm",
+      "name": "TBN 경인",
+      "group": "기타",
+      "type": "direct",
+      "epg": "라디오 TBN(경인).daum",
+      "logo": "tbn.png",
+      "url": "http://radio2.tbn.or.kr:1935/gyeongin/myStream/playlist.m3u8"
+    },
+    {
+      "id": "ifm",
+      "name": "경인방송 iFM",
+      "group": "기타",
+      "type": "direct",
+      "epg": "1974895.naver",
+      "logo": "itv.png",
+      "url": "https://stream.ifm.kr/live/aod1/playlist.m3u8"
+    },
+    {
+      "id": "arirang",
+      "name": "아리랑 라디오",
+      "group": "기타",
+      "type": "direct",
+      "epg": "라디오 Arirang.daum",
+      "logo": "arirang.png",
+      "url": "https://amdlive-ch03-ctnd-com.akamaized.net/arirang_3ch/smil:arirang_3ch.smil/chunklist_b656000_sleng.m3u8"
+    }
+  ]
+}

@@ -45,7 +45,7 @@ DEFAULT_CUSTOM_CHANNELS = [
 
 class Logic(PluginModuleBase):
     db_default = {
-        "upstream_url": "https://raw.githubusercontent.com/ohnggni/k_radio_android/config/channels.json",
+        "upstream_url": "",
         "ddns_url": "",
         "apikey": "",
         "tving_api_url": "http://127.0.0.1:8282/alive/api/url.m3u8?m=url&s=tving&i={id}&apikey={apikey}",
@@ -102,26 +102,8 @@ class Logic(PluginModuleBase):
             if not ModelSetting.get("apikey"):
                 ModelSetting.set("apikey", self.get_setting("apikey"))
 
-            # 로고 이미지 기본 다운로드 확인
-            yonhap_logo = os.path.join(self.logo_dir, "yonhapnewstv.png")
-            if not os.path.exists(yonhap_logo):
-                try:
-                    r = requests.get("https://image.tving.com/ntgs/contents/CTC/caic/CAIC0100/ko/20251023/0500/C01723.png", timeout=5)
-                    if r.status_code == 200:
-                        with open(yonhap_logo, "wb") as f:
-                            f.write(r.content)
-                except Exception as e:
-                    logger.warning(f"[ff_kradio] 연합뉴스 로고 다운로드 예외: {e}")
-
-            ytn_logo = os.path.join(self.logo_dir, "ytn.png")
-            if not os.path.exists(ytn_logo):
-                try:
-                    r = requests.get("https://raw.githubusercontent.com/ohnggni/k_radio/main/static/images/ytn.png", timeout=5)
-                    if r.status_code == 200:
-                        with open(ytn_logo, "wb") as f:
-                            f.write(r.content)
-                except Exception as e:
-                    logger.warning(f"[ff_kradio] YTN 로고 다운로드 예외: {e}")
+            # 기본 제공 로고 확인
+            pass
 
             # 기존 설정에 위키미디어 등 깨지는 URL이 있거나 EPG가 비어있으면 자동 마이그레이션
             channels = self.get_custom_channels()
@@ -152,17 +134,17 @@ class Logic(PluginModuleBase):
         return copy.deepcopy(DEFAULT_CUSTOM_CHANNELS)
 
     def fetch_upstream(self, force=False):
-        if not force and os.path.exists(self.cache_path):
-            try:
-                with open(self.cache_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    if data.get("channels"):
-                        return data
-            except Exception as e:
-                logger.warning(f"[ff_kradio] 캐시 로드 실패: {e}")
-
-        upstream_url = self.get_setting("upstream_url")
+        upstream_url = (self.get_setting("upstream_url") or "").strip()
         if upstream_url:
+            if not force and os.path.exists(self.cache_path):
+                try:
+                    with open(self.cache_path, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                        if data.get("channels"):
+                            return data
+                except Exception as e:
+                    logger.warning(f"[ff_kradio] 캐시 로드 실패: {e}")
+
             try:
                 res = requests.get(upstream_url, timeout=5)
                 if res.status_code == 200:
@@ -172,6 +154,17 @@ class Logic(PluginModuleBase):
                     return data
             except Exception as e:
                 logger.error(f"[ff_kradio] upstream 다운로드 실패: {e}")
+
+        # upstream_url이 지정되지 않았거나 다운로드 실패 시 번들된 기본 채널 목록 로드
+        default_json_path = os.path.join(self.cache_dir, "default_channels.json")
+        if os.path.exists(default_json_path):
+            try:
+                with open(default_json_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if data.get("channels"):
+                        return data
+            except Exception as e:
+                logger.warning(f"[ff_kradio] default_channels.json 로드 실패: {e}")
 
         if os.path.exists(self.cache_path):
             try:
@@ -240,7 +233,7 @@ class Logic(PluginModuleBase):
                 pass
 
         if not upstream_content:
-            upstream_epg_url = "https://raw.githubusercontent.com/ohnggni/k_radio_android/epg/xmltv.xml"
+            upstream_epg_url = (self.get_setting("upstream_epg_url") or "").strip()
             try:
                 r = requests.get(upstream_epg_url, timeout=10)
                 if r.status_code == 200:
