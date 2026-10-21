@@ -352,30 +352,46 @@ class Logic(PluginModuleBase):
                 except Exception as e:
                     logger.error(f"[ff_kradio] raw_json_override 파싱 실패: {e}")
 
-        base_data = self.fetch_upstream()
-        data = copy.deepcopy(base_data)
         ddns = (self.get_setting("ddns_url") or "").rstrip("/")
-        # KRadio 앱이 참조할 EPG URL
-        data["epgUrl"] = f"{ddns}/ff_kradio/xmltv.xml"
-        base_channels = data.get("channels", [])
-
-        custom_channels = self.get_custom_channels()
         apikey = self.get_setting("apikey") or ""
 
+        # 1. Base channels (filter disabled ones)
+        all_base = self.get_base_channels()
+        disabled_set = set(self.get_disabled_base_channels())
+        base_channels = []
+        for ch in all_base:
+            if ch.get("id") in disabled_set:
+                continue
+            item = copy.deepcopy(ch)
+            raw_logo = (item.get("logo") or "").strip()
+            if raw_logo and not (raw_logo.startswith("http://") or raw_logo.startswith("https://")):
+                item["logo"] = f"{ddns}/ff_kradio/logo/{raw_logo}"
+            base_channels.append(item)
+
+        # 2. Custom channels
+        custom_channels = self.get_custom_channels()
         for ch in custom_channels:
-            ch_id = ch.get("id") or "ch_" + str(len(base_channels))
-            audio_extract = ch.get("audio_extract", True)
-            source_type = ch.get("source_type", "tving")
-            source_val = ch.get("source_val", "")
+            ch_id = ch.get("id")
+            if not ch_id:
+                continue
+
             epg_val = (ch.get("epg") or "").strip()
-            if epg_val.isdigit():
-                epg_val = f"{epg_val}.naver"
+            if not epg_val and ch_id == "yonhapnewstv":
+                epg_val = "815508.naver"
+            elif not epg_val and ch_id == "ytn_tv":
+                epg_val = "814912.naver"
+
+            audio_extract = ch.get("audio_extract", True)
+            source_val = (ch.get("source_val") or "").strip()
+            source_type = ch.get("source_type", "direct")
 
             if audio_extract:
-                stream_url = f"{ddns}/ff_kradio/audio?id={ch_id}"
+                stream_url = f"{ddns}/ff_kradio/audio/{ch_id}"
             else:
-                if source_type == "tving":
-                    stream_url = f"{ddns}/alive/api/url.m3u8?m=url&s=tving&i={source_val}&apikey={apikey}"
+                if source_val.startswith("http://") or source_val.startswith("https://"):
+                    stream_url = source_val
+                elif source_val.startswith("C0") or source_type == "tving":
+                    stream_url = f"http://127.0.0.1:8282/alive/api/url.m3u8?m=url&s=tving&i={source_val}&apikey={apikey}"
                 else:
                     stream_url = source_val
 
@@ -396,20 +412,15 @@ class Logic(PluginModuleBase):
                 "logo": logo_url,
                 "url": stream_url
             }
+            base_channels.append(entry)
 
-            insert_after = ch.get("insert_after", "")
-            target_idx = -1
-            if insert_after:
-                for idx, c in enumerate(base_channels):
-                    if c.get("id") == insert_after:
-                        target_idx = idx
-                        break
-            if target_idx != -1:
-                base_channels.insert(target_idx + 1, entry)
-            else:
-                base_channels.append(entry)
-
-        data["channels"] = base_channels
+        data = {
+            "version": 2,
+            "latestVersionCode": 22,
+            "latestVersionName": "1.10.1",
+            "epgUrl": f"{ddns}/ff_kradio/xmltv.xml",
+            "channels": base_channels
+        }
         return data
 
     def process_menu(self, sub, req):
