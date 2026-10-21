@@ -54,7 +54,6 @@
               <th style="width: 90px;">소스 구분</th>
               <th>소스 주소/ID</th>
               <th style="width: 110px;" class="text-center">음성만 변환</th>
-              <th style="width: 90px;">삽입 위치</th>
               <th style="width: 120px;" class="text-center">관리</th>
             </tr>
           </thead>
@@ -86,7 +85,6 @@
                   <span class="badge badge-light border">직접 재생</span>
                 {% endif %}
               </td>
-              <td><small class="text-muted">{{ ch.insert_after or '(맨 뒤)' }}</small></td>
               <td class="text-center">
                 <button class="btn btn-sm btn-outline-secondary btn-edit-ch py-0 px-2">수정</button>
                 <button class="btn btn-sm btn-outline-danger btn-del-ch py-0 px-2 ml-1" data-id="{{ ch.id }}">삭제</button>
@@ -157,15 +155,9 @@
             <label>채널명 <span class="text-danger">*</span></label>
             <input type="text" name="name" id="ch-name" class="form-control" required placeholder="예: 연합뉴스TV, YTN">
           </div>
-          <div class="form-row">
-            <div class="form-group col-md-6">
-              <label>그룹</label>
-              <input type="text" name="group" id="ch-group" class="form-control" value="기타">
-            </div>
-            <div class="form-group col-md-6">
-              <label>삽입 위치 (특정 채널 뒤)</label>
-              <input type="text" name="insert_after" id="ch-insert-after" class="form-control" placeholder="예: ytn, kbs_1radio (비우면 맨 뒤)">
-            </div>
+          <div class="form-group">
+            <label>그룹</label>
+            <input type="text" name="group" id="ch-group" class="form-control" value="기타">
           </div>
           <div class="form-group">
             <label>방송 스트림 주소 (m3u8 URL 또는 채널 ID) <span class="text-danger">*</span></label>
@@ -270,7 +262,6 @@ $('#btn-add-channel').on('click', function() {
   $('#ch-id').prop('readonly', false).val('');
   $('#ch-name').val('');
   $('#ch-group').val('기타');
-  $('#ch-insert-after').val('ytn');
   $('#ch-source-val').val('');
   $('#ch-epg').val('');
   $('#ch-audio-extract').prop('checked', true);
@@ -285,7 +276,6 @@ $(document).on('click', '.btn-edit-ch', function() {
   $('#ch-id').prop('readonly', true).val(ch.id);
   $('#ch-name').val(ch.name);
   $('#ch-group').val(ch.group || '기타');
-  $('#ch-insert-after').val(ch.insert_after || '');
   $('#ch-source-val').val(ch.source_val || '');
   $('#ch-epg').val(ch.epg || '');
   $('#ch-audio-extract').prop('checked', ch.audio_extract !== false);
@@ -318,7 +308,6 @@ $('#form-channel').on('submit', function(e) {
     id: ($('#ch-id').val() || '').trim(),
     name: ($('#ch-name').val() || '').trim(),
     group: ($('#ch-group').val() || '기타').trim(),
-    insert_after: ($('#ch-insert-after').val() || '').trim(),
     source_type: source_type,
     source_val: source_val,
     epg: ($('#ch-epg').val() || '').trim(),

@@ -25,7 +25,6 @@ DEFAULT_CUSTOM_CHANNELS = [
         "source_type": "tving",
         "source_val": "C01723",
         "audio_extract": True,
-        "insert_after": "ytn",
         "logo": "yonhapnewstv.png",
         "epg": "815508.naver"
     },
@@ -37,7 +36,6 @@ DEFAULT_CUSTOM_CHANNELS = [
         "source_type": "tving",
         "source_val": "C00593",
         "audio_extract": True,
-        "insert_after": "yonhapnewstv",
         "logo": "ytn.png",
         "epg": "814912.naver"
     }
