@@ -1,6 +1,6 @@
 title: "K-Radio"
 version: "0.1.0"
 package_name: "ff_kradio"
-developer: "fromhd"
+developer: "DaeGumi"
 description: "KRadio 맞춤 채널 및 온디맨드 오디오 스트리머 플러그인"
 home: "https://github.com/fromhd/ff_kradio"
