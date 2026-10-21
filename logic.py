@@ -41,6 +41,19 @@ DEFAULT_CUSTOM_CHANNELS = [
     }
 ]
 
+_ENC_KEY = b"ff_kradio_2026_safe_key"
+
+def _decrypt_payload(enc_str):
+    try:
+        import zlib, base64
+        xored = base64.b85decode(enc_str.strip().encode("ascii"))
+        comp = bytes(b ^ _ENC_KEY[i % len(_ENC_KEY)] for i, b in enumerate(xored))
+        raw = zlib.decompress(comp)
+        return json.loads(raw.decode("utf-8"))
+    except Exception as e:
+        logger.error(f"[ff_kradio] 복호화 실패: {e}")
+        return None
+
 class Logic(PluginModuleBase):
     db_default = {
         "upstream_url": "",
@@ -122,6 +135,16 @@ class Logic(PluginModuleBase):
             logger.error(f"[ff_kradio] plugin_load 예외: {e}")
 
     def get_base_channels(self):
+        enc_path = os.path.join(self.cache_dir, "default_channels.enc")
+        if os.path.exists(enc_path):
+            try:
+                with open(enc_path, "r", encoding="ascii") as f:
+                    data = _decrypt_payload(f.read())
+                    if data and data.get("channels"):
+                        return data.get("channels", [])
+            except Exception as e:
+                logger.error(f"[ff_kradio] get_base_channels enc 에러: {e}")
+
         default_path = os.path.join(self.cache_dir, "default_channels.json")
         if os.path.exists(default_path):
             try:
@@ -129,7 +152,7 @@ class Logic(PluginModuleBase):
                     data = json.load(f)
                     return data.get("channels", [])
             except Exception as e:
-                logger.error(f"[ff_kradio] get_base_channels 에러: {e}")
+                logger.error(f"[ff_kradio] get_base_channels json 에러: {e}")
         return []
 
     def get_disabled_base_channels(self):
@@ -171,6 +194,16 @@ class Logic(PluginModuleBase):
                 logger.error(f"[ff_kradio] upstream 다운로드 실패: {e}")
 
         # upstream_url이 지정되지 않았거나 다운로드 실패 시 번들된 기본 채널 목록 로드
+        enc_path = os.path.join(self.cache_dir, "default_channels.enc")
+        if os.path.exists(enc_path):
+            try:
+                with open(enc_path, "r", encoding="ascii") as f:
+                    data = _decrypt_payload(f.read())
+                    if data and data.get("channels"):
+                        return data
+            except Exception as e:
+                logger.warning(f"[ff_kradio] default_channels.enc 로드 실패: {e}")
+
         default_json_path = os.path.join(self.cache_dir, "default_channels.json")
         if os.path.exists(default_json_path):
             try:
@@ -425,15 +458,16 @@ class Logic(PluginModuleBase):
                 return jsonify({"ret": "success"})
 
             elif sub == "sync_base_channels":
-                sync_url = "https://raw.githubusercontent.com/fromhd/ff_kradio/main/default_channels.json"
+                sync_url = "https://raw.githubusercontent.com/fromhd/ff_kradio/main/default_channels.enc"
                 try:
                     res = requests.get(sync_url, timeout=10)
                     if res.status_code == 200:
-                        data = res.json()
-                        if data.get("channels") and len(data["channels"]) > 0:
-                            default_path = os.path.join(self.cache_dir, "default_channels.json")
-                            with open(default_path, "w", encoding="utf-8") as f:
-                                json.dump(data, f, ensure_ascii=False, indent=2)
+                        enc_text = res.text
+                        data = _decrypt_payload(enc_text)
+                        if data and data.get("channels") and len(data["channels"]) > 0:
+                            enc_path = os.path.join(self.cache_dir, "default_channels.enc")
+                            with open(enc_path, "w", encoding="ascii") as f:
+                                f.write(enc_text.strip())
                             return jsonify({"ret": "success", "message": f"공식 기본 채널 {len(data['channels'])}개가 최신으로 동기화되었습니다."})
                 except Exception as e:
                     logger.error(f"[ff_kradio] sync_base_channels 실패: {e}")
