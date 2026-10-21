@@ -394,6 +394,7 @@ class Logic(PluginModuleBase):
                 return jsonify({"ret": "success", "message": "설정이 저장되었습니다."})
 
             elif sub == "save_channel":
+                orig_id = req.form.get("orig_id", "").strip()
                 ch_id = req.form.get("id", "").strip()
                 name = req.form.get("name", "").strip()
                 group = req.form.get("group", "기타").strip()
@@ -409,8 +410,10 @@ class Logic(PluginModuleBase):
 
                 channels = self.get_custom_channels()
                 updated = False
+                target_key = orig_id if orig_id else ch_id
                 for ch in channels:
-                    if ch.get("id") == ch_id:
+                    if ch.get("id") == target_key:
+                        ch["id"] = ch_id
                         ch["name"] = name
                         ch["group"] = group
                         ch["source_type"] = source_type

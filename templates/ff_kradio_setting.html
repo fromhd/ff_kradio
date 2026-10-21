@@ -146,6 +146,7 @@
           </button>
         </div>
         <div class="modal-body">
+          <input type="hidden" name="orig_id" id="ch-orig-id">
           <div class="form-group">
             <label>채널 ID <span class="text-danger">*</span></label>
             <input type="text" name="id" id="ch-id" class="form-control" required placeholder="예: yonhapnewstv, ytn_tv">
@@ -259,6 +260,7 @@ $('#btn-refresh-epg').on('click', function() {
 
 $('#btn-add-channel').on('click', function() {
   $('#modal-title').text('방송 채널 추가');
+  $('#ch-orig-id').val('');
   $('#ch-id').prop('readonly', false).val('');
   $('#ch-name').val('');
   $('#ch-group').val('기타');
@@ -273,7 +275,8 @@ $(document).on('click', '.btn-edit-ch', function() {
   var tr = $(this).closest('tr');
   var ch = tr.data('channel');
   $('#modal-title').text('방송 채널 수정 (' + ch.id + ')');
-  $('#ch-id').prop('readonly', true).val(ch.id);
+  $('#ch-orig-id').val(ch.id);
+  $('#ch-id').prop('readonly', false).val(ch.id);
   $('#ch-name').val(ch.name);
   $('#ch-group').val(ch.group || '기타');
   $('#ch-source-val').val(ch.source_val || '');
@@ -305,6 +308,7 @@ $('#form-channel').on('submit', function(e) {
   var source_val = ($('#ch-source-val').val() || '').trim();
   var source_type = (source_val.startsWith('http://') || source_val.startsWith('https://')) ? 'direct' : 'tving';
   var data = {
+    orig_id: ($('#ch-orig-id').val() || '').trim(),
     id: ($('#ch-id').val() || '').trim(),
     name: ($('#ch-name').val() || '').trim(),
     group: ($('#ch-group').val() || '기타').trim(),
