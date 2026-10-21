@@ -129,13 +129,6 @@
             <small class="form-text text-muted">외부 채널 목록 JSON 주소입니다. (비워둘 시 플러그인에 내장된 기본 채널 목록이 사용됩니다)</small>
           </div>
         </div>
-        <div class="form-group row">
-          <label class="col-sm-2 col-form-label">티빙 API URL 템플릿</label>
-          <div class="col-sm-10">
-            <input type="text" name="tving_api_url" class="form-control" value="{{ arg.tving_api_url | e }}">
-            <small class="form-text text-muted">Alive 플러그인의 티빙 스트림 API 패턴입니다. ({id}, {apikey} 포함)</small>
-          </div>
-        </div>
         <button type="submit" class="btn btn-primary">설정 저장</button>
         <span id="setting-msg" class="ml-2 font-weight-bold"></span>
       </form>
@@ -175,15 +168,9 @@
             </div>
           </div>
           <div class="form-group">
-            <label>방송 소스 형태</label>
-            <select name="source_type" id="ch-source-type" class="form-control">
-              <option value="tving">티빙 채널 ID (예: C01723 연합뉴스, C00593 YTN)</option>
-              <option value="direct">직접 스트림 주소 (m3u8 / http URL)</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>소스 주소 또는 채널 ID <span class="text-danger">*</span></label>
-            <input type="text" name="source_val" id="ch-source-val" class="form-control" required placeholder="예: C01723 또는 https://...">
+            <label>방송 스트림 주소 (m3u8 URL 또는 채널 ID) <span class="text-danger">*</span></label>
+            <input type="text" name="source_val" id="ch-source-val" class="form-control" required placeholder="예: Alive에서 [클립보드 복사]한 m3u8 주소, 무료 m3u8 주소, 또는 C01723">
+            <small class="form-text text-muted">Alive 플러그인(티빙, 웨이브 등)에서 복사한 실시간 m3u8 주소나 인터넷 m3u8 주소를 그대로 붙여넣으세요.</small>
           </div>
           <div class="form-group">
             <label>EPG ID (선택)</label>
@@ -284,7 +271,6 @@ $('#btn-add-channel').on('click', function() {
   $('#ch-name').val('');
   $('#ch-group').val('기타');
   $('#ch-insert-after').val('ytn');
-  $('#ch-source-type').val('tving');
   $('#ch-source-val').val('');
   $('#ch-epg').val('');
   $('#ch-audio-extract').prop('checked', true);
@@ -300,7 +286,6 @@ $(document).on('click', '.btn-edit-ch', function() {
   $('#ch-name').val(ch.name);
   $('#ch-group').val(ch.group || '기타');
   $('#ch-insert-after').val(ch.insert_after || '');
-  $('#ch-source-type').val(ch.source_type || 'tving');
   $('#ch-source-val').val(ch.source_val || '');
   $('#ch-epg').val(ch.epg || '');
   $('#ch-audio-extract').prop('checked', ch.audio_extract !== false);
@@ -327,16 +312,18 @@ $(document).on('click', '.btn-del-ch', function() {
 
 $('#form-channel').on('submit', function(e) {
   e.preventDefault();
+  var source_val = ($('#ch-source-val').val() || '').trim();
+  var source_type = (source_val.startsWith('http://') || source_val.startsWith('https://')) ? 'direct' : 'tving';
   var data = {
-    id: $('#ch-id').val(),
-    name: $('#ch-name').val(),
-    group: $('#ch-group').val(),
-    insert_after: $('#ch-insert-after').val(),
-    source_type: $('#ch-source-type').val(),
-    source_val: $('#ch-source-val').val(),
-    epg: $('#ch-epg').val(),
+    id: ($('#ch-id').val() || '').trim(),
+    name: ($('#ch-name').val() || '').trim(),
+    group: ($('#ch-group').val() || '기타').trim(),
+    insert_after: ($('#ch-insert-after').val() || '').trim(),
+    source_type: source_type,
+    source_val: source_val,
+    epg: ($('#ch-epg').val() || '').trim(),
     audio_extract: $('#ch-audio-extract').is(':checked'),
-    logo: $('#ch-logo').val()
+    logo: ($('#ch-logo').val() || '').trim()
   };
 
   $.ajax({

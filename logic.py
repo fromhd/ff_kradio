@@ -48,7 +48,6 @@ class Logic(PluginModuleBase):
         "upstream_url": "",
         "ddns_url": "",
         "apikey": "",
-        "tving_api_url": "http://127.0.0.1:8282/alive/api/url.m3u8?m=url&s=tving&i={id}&apikey={apikey}",
         "custom_channels_json": json.dumps(DEFAULT_CUSTOM_CHANNELS, ensure_ascii=False),
         "use_raw_override": "False",
         "raw_json_override": ""
@@ -373,7 +372,6 @@ class Logic(PluginModuleBase):
             "upstream_url": self.get_setting("upstream_url"),
             "ddns_url": self.get_setting("ddns_url"),
             "apikey": self.get_setting("apikey"),
-            "tving_api_url": self.get_setting("tving_api_url"),
             "channels_url": channels_url,
             "epg_url": epg_url,
             "custom_channels": self.get_custom_channels(),
@@ -395,7 +393,6 @@ class Logic(PluginModuleBase):
                 ModelSetting.set("upstream_url", req.form.get("upstream_url", "").strip())
                 ModelSetting.set("ddns_url", req.form.get("ddns_url", "").strip())
                 ModelSetting.set("apikey", req.form.get("apikey", "").strip())
-                ModelSetting.set("tving_api_url", req.form.get("tving_api_url", "").strip())
                 return jsonify({"ret": "success", "message": "설정이 저장되었습니다."})
 
             elif sub == "save_channel":
@@ -521,10 +518,11 @@ class Logic(PluginModuleBase):
                     break
 
             apikey = self.get_setting("apikey") or ""
-            tving_fmt = self.get_setting("tving_api_url") or "http://127.0.0.1:8282/alive/api/url.m3u8?m=url&s=tving&i={id}&apikey={apikey}"
 
-            if source_type == "tving" or source_val.startswith("C0"):
-                target_url = tving_fmt.format(id=source_val, apikey=apikey)
+            if source_val.startswith("http://") or source_val.startswith("https://"):
+                target_url = source_val
+            elif source_val.startswith("C0") or source_type == "tving":
+                target_url = f"http://127.0.0.1:8282/alive/api/url.m3u8?m=url&s=tving&i={source_val}&apikey={apikey}"
             else:
                 target_url = source_val
 
