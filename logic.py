@@ -121,6 +121,24 @@ class Logic(PluginModuleBase):
         except Exception as e:
             logger.error(f"[ff_kradio] plugin_load 예외: {e}")
 
+    def get_base_channels(self):
+        default_path = os.path.join(self.cache_dir, "default_channels.json")
+        if os.path.exists(default_path):
+            try:
+                with open(default_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    return data.get("channels", [])
+            except Exception as e:
+                logger.error(f"[ff_kradio] get_base_channels 에러: {e}")
+        return []
+
+    def get_disabled_base_channels(self):
+        raw = ModelSetting.get("disabled_base_channels") or "[]"
+        try:
+            return json.loads(raw)
+        except Exception:
+            return []
+
     def get_custom_channels(self):
         try:
             raw = ModelSetting.get("custom_channels_json")
@@ -372,6 +390,8 @@ class Logic(PluginModuleBase):
             "apikey": self.get_setting("apikey"),
             "channels_url": channels_url,
             "epg_url": epg_url,
+            "base_channels": self.get_base_channels(),
+            "disabled_base": self.get_disabled_base_channels(),
             "custom_channels": self.get_custom_channels(),
             "use_raw_override": ModelSetting.get_bool("use_raw_override"),
             "raw_json_override": ModelSetting.get("raw_json_override") or "",
@@ -392,6 +412,33 @@ class Logic(PluginModuleBase):
                 ModelSetting.set("ddns_url", req.form.get("ddns_url", "").strip())
                 ModelSetting.set("apikey", req.form.get("apikey", "").strip())
                 return jsonify({"ret": "success", "message": "설정이 저장되었습니다."})
+
+            elif sub == "toggle_base_channel":
+                ch_id = req.form.get("id", "").strip()
+                enabled = str(req.form.get("enabled", "true")).lower() in ("true", "1", "on")
+                disabled = set(self.get_disabled_base_channels())
+                if enabled:
+                    disabled.discard(ch_id)
+                else:
+                    disabled.add(ch_id)
+                ModelSetting.set("disabled_base_channels", json.dumps(list(disabled)))
+                return jsonify({"ret": "success"})
+
+            elif sub == "sync_base_channels":
+                sync_url = "https://raw.githubusercontent.com/fromhd/ff_kradio/main/default_channels.json"
+                try:
+                    res = requests.get(sync_url, timeout=10)
+                    if res.status_code == 200:
+                        data = res.json()
+                        if data.get("channels") and len(data["channels"]) > 0:
+                            default_path = os.path.join(self.cache_dir, "default_channels.json")
+                            with open(default_path, "w", encoding="utf-8") as f:
+                                json.dump(data, f, ensure_ascii=False, indent=2)
+                            return jsonify({"ret": "success", "message": f"공식 기본 채널 {len(data['channels'])}개가 최신으로 동기화되었습니다."})
+                except Exception as e:
+                    logger.error(f"[ff_kradio] sync_base_channels 실패: {e}")
+                    return jsonify({"ret": "error", "message": f"동기화 실패: {e}"})
+                return jsonify({"ret": "error", "message": "동기화할 채널 데이터를 가져오지 못했습니다."})
 
             elif sub == "save_channel":
                 orig_id = req.form.get("orig_id", "").strip()

@@ -4,12 +4,13 @@
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h4>K-Radio 채널 관리</h4>
     <div>
-      <button id="btn-refresh-upstream" class="btn btn-outline-info btn-sm">공식 기본 채널 갱신</button>
+      <button id="btn-sync-base" class="btn btn-outline-primary btn-sm">공식 기본 채널 최신 동기화</button>
       <button id="btn-refresh-epg" class="btn btn-outline-success btn-sm ml-1">EPG 즉시 갱신</button>
-      <button id="btn-add-channel" class="btn btn-primary btn-sm ml-2">+ 커스텀 채널 추가</button>
+      <button id="btn-add-channel" class="btn btn-primary btn-sm ml-2">+ 추가 채널 등록</button>
     </div>
   </div>
 
+  <!-- 연동 주소 안내 카드 -->
   <div class="card mb-4 border-primary">
     <div class="card-header bg-primary text-white py-2 font-weight-bold">
       KRadio 앱 연동 주소
@@ -38,28 +39,32 @@
     </div>
   </div>
 
+  <!-- 카드 1: K-Radio 공식 기본 라디오 채널 -->
   <div class="card mb-4">
-    <div class="card-header font-weight-bold py-2">
-      추가/커스텀 방송 채널 목록
+    <div class="card-header font-weight-bold py-2 d-flex justify-content-between align-items-center">
+      <div>
+        <span>K-Radio 공식 라디오 방송</span>
+        <span class="badge badge-info ml-2">{{ arg.base_channels | length }}개 기본 제공</span>
+      </div>
+      <small class="text-muted">스위치로 원하는 방송만 켜거나 끌 수 있습니다 (실시간 반영)</small>
     </div>
     <div class="card-body p-0">
-      <div class="table-responsive">
+      <div class="table-responsive" style="max-height: 380px; overflow-y: auto;">
         <table class="table table-hover table-striped mb-0">
-          <thead class="thead-light">
+          <thead class="thead-light sticky-top">
             <tr>
-              <th style="width: 120px;">ID</th>
-              <th style="width: 130px;">채널명</th>
-              <th style="width: 70px;">그룹</th>
-              <th style="width: 110px;">EPG ID</th>
-              <th style="width: 90px;">소스 구분</th>
-              <th>소스 주소/ID</th>
-              <th style="width: 110px;" class="text-center">음성만 변환</th>
-              <th style="width: 120px;" class="text-center">관리</th>
+              <th style="width: 50px;" class="text-center">No</th>
+              <th style="width: 130px;">ID</th>
+              <th style="width: 160px;">채널명</th>
+              <th style="width: 90px;">방송사</th>
+              <th>EPG ID</th>
+              <th style="width: 100px;" class="text-center">사용 여부</th>
             </tr>
           </thead>
-          <tbody id="channel-table-body">
-            {% for ch in arg.custom_channels %}
-            <tr data-channel='{{ ch | tojson | forceescape }}'>
+          <tbody>
+            {% for ch in arg.base_channels %}
+            <tr>
+              <td class="text-center text-muted"><small>{{ loop.index }}</small></td>
               <td><code>{{ ch.id }}</code></td>
               <td><b>{{ ch.name }}</b></td>
               <td><span class="badge badge-secondary">{{ ch.group }}</span></td>
@@ -70,11 +75,58 @@
                   <span class="badge badge-light text-muted">없음</span>
                 {% endif %}
               </td>
+              <td class="text-center">
+                <div class="custom-control custom-switch">
+                  <input type="checkbox" class="custom-control-input base-toggle" id="base-ch-{{ ch.id }}" data-id="{{ ch.id }}" {% if ch.id not in arg.disabled_base %}checked{% endif %}>
+                  <label class="custom-control-label" for="base-ch-{{ ch.id }}"></label>
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="6" class="text-center text-muted py-3">기본 채널 데이터가 없습니다.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- 카드 2: 사용자 추가 방송 채널 -->
+  <div class="card mb-4">
+    <div class="card-header font-weight-bold py-2 d-flex justify-content-between align-items-center">
+      <div>
+        <span>사용자 추가 방송 채널</span>
+        <span class="badge badge-success ml-2">{{ arg.custom_channels | length }}개 등록됨</span>
+      </div>
+      <button class="btn btn-sm btn-primary py-0 px-2" onclick="$('#btn-add-channel').click()">+ 채널 추가</button>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover table-striped mb-0">
+          <thead class="thead-light">
+            <tr>
+              <th style="width: 130px;">ID</th>
+              <th style="width: 150px;">채널명</th>
+              <th style="width: 80px;">그룹</th>
+              <th style="width: 120px;">EPG ID</th>
+              <th>스트림 소스 주소</th>
+              <th style="width: 110px;" class="text-center">음성만 변환</th>
+              <th style="width: 120px;" class="text-center">관리</th>
+            </tr>
+          </thead>
+          <tbody id="channel-table-body">
+            {% for ch in arg.custom_channels %}
+            <tr data-channel='{{ ch | tojson | forceescape }}'>
+              <td><code>{{ ch.id }}</code></td>
+              <td><b>{{ ch.name }}</b></td>
+              <td><span class="badge badge-info">{{ ch.group }}</span></td>
               <td>
-                {% if ch.source_type == 'tving' %}
-                  <span class="badge badge-info">티빙 (TV)</span>
+                {% if ch.epg %}
+                  <span class="badge badge-primary">{{ ch.epg }}</span>
                 {% else %}
-                  <span class="badge badge-secondary">직접 URL</span>
+                  <span class="badge badge-light text-muted">없음</span>
                 {% endif %}
               </td>
               <td><small class="text-break">{{ ch.source_val }}</small></td>
@@ -92,7 +144,7 @@
             </tr>
             {% else %}
             <tr>
-              <td colspan="9" class="text-center text-muted py-4">등록된 커스텀 채널이 없습니다.</td>
+              <td colspan="7" class="text-center text-muted py-4">등록된 추가 채널이 없습니다. [+ 채널 추가] 버튼으로 TV/라디오 방송을 등록하세요.</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -101,6 +153,7 @@
     </div>
   </div>
 
+  <!-- 카드 3: 플러그인 환경 설정 -->
   <div class="card mb-4">
     <div class="card-header font-weight-bold py-2">
       플러그인 환경 설정
@@ -118,13 +171,6 @@
           <label class="col-sm-2 col-form-label">API Key</label>
           <div class="col-sm-10">
             <input type="text" name="apikey" class="form-control" value="{{ arg.apikey | e }}">
-          </div>
-        </div>
-        <div class="form-group row">
-          <label class="col-sm-2 col-form-label">외부 channels.json URL (선택)</label>
-          <div class="col-sm-10">
-            <input type="text" name="upstream_url" class="form-control" value="{{ arg.upstream_url | e }}">
-            <small class="form-text text-muted">외부 채널 목록 JSON 주소입니다. (비워둘 시 플러그인에 내장된 기본 채널 목록이 사용됩니다)</small>
           </div>
         </div>
         <button type="submit" class="btn btn-primary">설정 저장</button>
@@ -158,12 +204,12 @@
           </div>
           <div class="form-group">
             <label>그룹</label>
-            <input type="text" name="group" id="ch-group" class="form-control" value="기타">
+            <input type="text" name="group" id="ch-group" class="form-control" value="TV">
           </div>
           <div class="form-group">
             <label>방송 스트림 주소 (m3u8 URL 또는 채널 ID) <span class="text-danger">*</span></label>
             <input type="text" name="source_val" id="ch-source-val" class="form-control" required placeholder="예: Alive에서 [클립보드 복사]한 m3u8 주소, 무료 m3u8 주소, 또는 C01723">
-            <small class="form-text text-muted">Alive 플러그인(티빙, 웨이브 등)에서 복사한 실시간 m3u8 주소나 인터넷 m3u8 주소를 그대로 붙여넣으세요.</small>
+            <small class="form-text text-muted">Alive 플러그인(티빙, 웨이브, MBC 등)에서 복사한 실시간 m3u8 주소나 인터넷 m3u8 주소를 그대로 붙여넣으세요.</small>
           </div>
           <div class="form-group">
             <label>EPG ID (선택)</label>
@@ -178,7 +224,7 @@
             <small class="form-text text-muted mt-1">체크 시 KRadio에서 켤 때만 N100의 ffmpeg가 비디오를 제외하고 오디오만 실시간 복사 추출합니다. (TV 방송 청취 시 필수)</small>
           </div>
           <div class="form-group">
-            <label>로고 이미지 URL / 파일명 (선택)</label>
+            <label>로고 이미지 파일명 / URL (선택)</label>
             <input type="text" name="logo" id="ch-logo" class="form-control" placeholder="yonhapnewstv.png 또는 http://...">
           </div>
         </div>
@@ -210,51 +256,59 @@ function copyEpgUrl() {
   });
 }
 
-$('#form-settings').on('submit', function(e) {
-  e.preventDefault();
-  $('#setting-msg').removeClass('text-danger text-success').text('저장 중...');
+// 기본 채널 ON/OFF 토글
+$(document).on('change', '.base-toggle', function() {
+  var id = $(this).data('id');
+  var enabled = $(this).is(':checked');
   $.ajax({
-    url: '/ff_kradio/ajax/save_setting',
+    url: '/ff_kradio/ajax/toggle_base_channel',
     type: 'POST',
-    data: $(this).serialize(),
+    data: { id: id, enabled: enabled },
     dataType: 'json'
-  }).done(function(res) {
-    if (res.ret === 'success') {
-      $('#setting-msg').addClass('text-success').text(res.message);
-      setTimeout(function(){ location.reload(); }, 800);
-    } else {
-      $('#setting-msg').addClass('text-danger').text(res.message);
-    }
   }).fail(function() {
-    $('#setting-msg').addClass('text-danger').text('통신 오류 발생');
+    alert('토글 상태 저장 중 통신 오류가 발생했습니다.');
   });
 });
 
-$('#btn-refresh-upstream').on('click', function() {
-  if (!confirm('공식 기본 채널을 다시 가져오시겠습니까?')) return;
+// 기본 채널 최신 동기화
+$('#btn-sync-base').on('click', function() {
+  var btn = $(this);
+  btn.prop('disabled', true).text('동기화 중...');
   $.ajax({
-    url: '/ff_kradio/ajax/refresh_upstream',
+    url: '/ff_kradio/ajax/sync_base_channels',
     type: 'POST',
     dataType: 'json'
   }).done(function(res) {
-    alert(res.message || '갱신 완료');
-    location.reload();
+    btn.prop('disabled', false).text('공식 기본 채널 최신 동기화');
+    if (res.ret === 'success') {
+      alert(res.message);
+      location.reload();
+    } else {
+      alert(res.message || '동기화 실패');
+    }
+  }).fail(function() {
+    btn.prop('disabled', false).text('공식 기본 채널 최신 동기화');
+    alert('통신 오류가 발생했습니다.');
   });
 });
 
 $('#btn-refresh-epg').on('click', function() {
   var btn = $(this);
-  btn.prop('disabled', true).text('갱신 중...');
+  btn.prop('disabled', true).text('EPG 갱신 중...');
   $.ajax({
     url: '/ff_kradio/ajax/refresh_epg',
     type: 'POST',
     dataType: 'json'
   }).done(function(res) {
-    alert(res.message || 'EPG 갱신 완료');
     btn.prop('disabled', false).text('EPG 즉시 갱신');
+    if (res.ret === 'success') {
+      alert(res.message || 'EPG가 갱신되었습니다.');
+    } else {
+      alert(res.message || '갱신 실패');
+    }
   }).fail(function() {
-    alert('EPG 갱신 중 통신 오류가 발생했습니다.');
     btn.prop('disabled', false).text('EPG 즉시 갱신');
+    alert('통신 오류가 발생했습니다.');
   });
 });
 
@@ -263,7 +317,7 @@ $('#btn-add-channel').on('click', function() {
   $('#ch-orig-id').val('');
   $('#ch-id').prop('readonly', false).val('');
   $('#ch-name').val('');
-  $('#ch-group').val('기타');
+  $('#ch-group').val('TV');
   $('#ch-source-val').val('');
   $('#ch-epg').val('');
   $('#ch-audio-extract').prop('checked', true);
@@ -278,7 +332,7 @@ $(document).on('click', '.btn-edit-ch', function() {
   $('#ch-orig-id').val(ch.id);
   $('#ch-id').prop('readonly', false).val(ch.id);
   $('#ch-name').val(ch.name);
-  $('#ch-group').val(ch.group || '기타');
+  $('#ch-group').val(ch.group || 'TV');
   $('#ch-source-val').val(ch.source_val || '');
   $('#ch-epg').val(ch.epg || '');
   $('#ch-audio-extract').prop('checked', ch.audio_extract !== false);
@@ -311,7 +365,7 @@ $('#form-channel').on('submit', function(e) {
     orig_id: ($('#ch-orig-id').val() || '').trim(),
     id: ($('#ch-id').val() || '').trim(),
     name: ($('#ch-name').val() || '').trim(),
-    group: ($('#ch-group').val() || '기타').trim(),
+    group: ($('#ch-group').val() || 'TV').trim(),
     source_type: source_type,
     source_val: source_val,
     epg: ($('#ch-epg').val() || '').trim(),
@@ -333,6 +387,27 @@ $('#form-channel').on('submit', function(e) {
     }
   }).fail(function() {
     alert('통신 오류가 발생했습니다.');
+  });
+});
+
+$('#form-settings').on('submit', function(e) {
+  e.preventDefault();
+  var formData = $(this).serialize();
+  $.ajax({
+    url: '/ff_kradio/ajax/save_setting',
+    type: 'POST',
+    data: formData,
+    dataType: 'json'
+  }).done(function(res) {
+    var msg = $('#setting-msg');
+    if (res.ret === 'success') {
+      msg.removeClass('text-danger').addClass('text-success').text(res.message);
+      setTimeout(function() { msg.text(''); }, 3000);
+    } else {
+      msg.removeClass('text-success').addClass('text-danger').text(res.message || '저장 실패');
+    }
+  }).fail(function() {
+    alert('설정 저장 중 오류가 발생했습니다.');
   });
 });
 </script>
