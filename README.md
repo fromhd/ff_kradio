@@ -66,5 +66,5 @@ FlaskFarm을 재시작하면 자동으로 플러그인이 로드됩니다.
 
 ## 📄 라이선스 및 크레딧
 
-- **Developer**: fromhd
+- **Developer**: DaeGumi
 - **License**: MIT License
