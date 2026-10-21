@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4>K-Radio channels.json 전체 에디터</h4>
+    <a href="/ff_kradio/setting" class="btn btn-outline-secondary btn-sm">&larr; 채널 관리로 돌아가기</a>
+  </div>
+
+  <div class="alert alert-info py-2">
+    현재 KRadio 앱에 최종 전달되는 <code>channels.json</code> 전체 구조입니다.<br>
+    기본 채널과 커스텀 채널이 자동 병합된 상태를 확인할 수 있으며, 필요 시 "직접 덮어쓰기 모드"를 켜서 JSON 전체를 원하는 대로 수정하여 배포할 수도 있습니다.
+  </div>
+
+  <form id="form-raw-json">
+    <div class="form-group p-3 border rounded bg-light mb-3">
+      <div class="custom-control custom-switch">
+        <input type="checkbox" class="custom-control-input" id="use-raw-override" name="use_raw_override" value="true" {% if arg.use_raw_override %}checked{% endif %}>
+        <label class="custom-control-label font-weight-bold" for="use-raw-override">수동 JSON 직접 덮어쓰기 모드 활성화</label>
+      </div>
+      <small class="form-text text-muted">체크 시 아래 입력창에 작성된 JSON 내용 그대로를 KRadio 앱에 제공합니다. (체크 해제 시 기본 채널 + 커스텀 채널 자동 병합 모드로 동작)</small>
+    </div>
+
+    <div class="form-group">
+      <textarea id="raw-json-text" name="raw_json" class="form-control font-monospace" rows="22" style="font-family: Consolas, monospace; font-size: 13px;">{{ arg.raw_json_override if arg.use_raw_override and arg.raw_json_override else arg.current_json }}</textarea>
+    </div>
+
+    <div class="d-flex align-items-center">
+      <button type="submit" class="btn btn-primary">JSON 저장</button>
+      <button type="button" class="btn btn-outline-secondary ml-2" id="btn-format-json">JSON 정렬</button>
+      <span id="save-msg" class="ml-3 font-weight-bold"></span>
+    </div>
+  </form>
+</div>
+
+<script>
+$('#btn-format-json').on('click', function() {
+  try {
+    var obj = JSON.parse($('#raw-json-text').val());
+    $('#raw-json-text').val(JSON.stringify(obj, null, 2));
+  } catch (e) {
+    alert('JSON 파싱 오류: ' + e.message);
+  }
+});
+
+$('#form-raw-json').on('submit', function(e) {
+  e.preventDefault();
+  $('#save-msg').removeClass('text-danger text-success').text('저장 중...');
+  var rawText = $('#raw-json-text').val();
+  var useRaw = $('#use-raw-override').is(':checked');
+
+  if (useRaw) {
+    try {
+      JSON.parse(rawText);
+    } catch (err) {
+      $('#save-msg').addClass('text-danger').text('JSON 문법 오류: ' + err.message);
+      return;
+    }
+  }
+
+  $.ajax({
+    url: '/ff_kradio/ajax/save_raw_json',
+    type: 'POST',
+    data: {
+      use_raw_override: useRaw,
+      raw_json: rawText
+    },
+    dataType: 'json'
+  }).done(function(res) {
+    if (res.ret === 'success') {
+      $('#save-msg').addClass('text-success').text(res.message);
+      setTimeout(function(){ location.reload(); }, 800);
+    } else {
+      $('#save-msg').addClass('text-danger').text(res.message);
+    }
+  }).fail(function() {
+    $('#save-msg').addClass('text-danger').text('통신 오류 발생');
+  });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,15 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Runtime cache files
+upstream_cache.json
+upstream_xmltv.xml
+xmltv_merged.xml
+
+# OS generated files
+.DS_Store
+Thumbs.db
+*.swp
+*~

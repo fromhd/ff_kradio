@@ -1,0 +1,359 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4>K-Radio 채널 관리</h4>
+    <div>
+      <button id="btn-refresh-upstream" class="btn btn-outline-info btn-sm">공식 기본 채널 갱신</button>
+      <button id="btn-refresh-epg" class="btn btn-outline-success btn-sm ml-1">EPG 즉시 갱신</button>
+      <button id="btn-add-channel" class="btn btn-primary btn-sm ml-2">+ 커스텀 채널 추가</button>
+    </div>
+  </div>
+
+  <div class="card mb-4 border-primary">
+    <div class="card-header bg-primary text-white py-2 font-weight-bold">
+      KRadio 앱 연동 주소
+    </div>
+    <div class="card-body py-2">
+      <div class="form-group mb-2">
+        <label class="small font-weight-bold mb-1">채널 설정 주소 (channels.json)</label>
+        <div class="input-group input-group-sm">
+          <input type="text" id="kradio-url" class="form-control" value="{{ arg.channels_url | e }}" readonly>
+          <div class="input-group-append">
+            <button class="btn btn-outline-primary" type="button" onclick="copyKRadioUrl()">주소 복사</button>
+          </div>
+        </div>
+        <small class="form-text text-muted">KRadio 안드로이드 앱의 <b>설정 &gt; 채널 설정 주소</b>에 위 주소를 입력하세요. (EPG 주소도 앱에서 자동 로드됩니다)</small>
+      </div>
+      <div class="form-group mb-1">
+        <label class="small font-weight-bold mb-1">통합 EPG XML 주소 (xmltv.xml)</label>
+        <div class="input-group input-group-sm">
+          <input type="text" id="epg-url" class="form-control" value="{{ arg.epg_url | e }}" readonly>
+          <div class="input-group-append">
+            <button class="btn btn-outline-secondary" type="button" onclick="copyEpgUrl()">주소 복사</button>
+            <a href="/ff_kradio/xmltv.xml" target="_blank" class="btn btn-outline-info">미리보기</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-header font-weight-bold py-2">
+      추가/커스텀 방송 채널 목록
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover table-striped mb-0">
+          <thead class="thead-light">
+            <tr>
+              <th style="width: 120px;">ID</th>
+              <th style="width: 130px;">채널명</th>
+              <th style="width: 70px;">그룹</th>
+              <th style="width: 110px;">EPG ID</th>
+              <th style="width: 90px;">소스 구분</th>
+              <th>소스 주소/ID</th>
+              <th style="width: 110px;" class="text-center">음성만 변환</th>
+              <th style="width: 90px;">삽입 위치</th>
+              <th style="width: 120px;" class="text-center">관리</th>
+            </tr>
+          </thead>
+          <tbody id="channel-table-body">
+            {% for ch in arg.custom_channels %}
+            <tr data-channel='{{ ch | tojson | forceescape }}'>
+              <td><code>{{ ch.id }}</code></td>
+              <td><b>{{ ch.name }}</b></td>
+              <td><span class="badge badge-secondary">{{ ch.group }}</span></td>
+              <td>
+                {% if ch.epg %}
+                  <span class="badge badge-primary">{{ ch.epg }}</span>
+                {% else %}
+                  <span class="badge badge-light text-muted">없음</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if ch.source_type == 'tving' %}
+                  <span class="badge badge-info">티빙 (TV)</span>
+                {% else %}
+                  <span class="badge badge-secondary">직접 URL</span>
+                {% endif %}
+              </td>
+              <td><small class="text-break">{{ ch.source_val }}</small></td>
+              <td class="text-center">
+                {% if ch.audio_extract %}
+                  <span class="badge badge-success">AAC 변환 ON</span>
+                {% else %}
+                  <span class="badge badge-light border">직접 재생</span>
+                {% endif %}
+              </td>
+              <td><small class="text-muted">{{ ch.insert_after or '(맨 뒤)' }}</small></td>
+              <td class="text-center">
+                <button class="btn btn-sm btn-outline-secondary btn-edit-ch py-0 px-2">수정</button>
+                <button class="btn btn-sm btn-outline-danger btn-del-ch py-0 px-2 ml-1" data-id="{{ ch.id }}">삭제</button>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="9" class="text-center text-muted py-4">등록된 커스텀 채널이 없습니다.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-header font-weight-bold py-2">
+      플러그인 환경 설정
+    </div>
+    <div class="card-body">
+      <form id="form-settings">
+        <div class="form-group row">
+          <label class="col-sm-2 col-form-label">DDNS 접속 주소</label>
+          <div class="col-sm-10">
+            <input type="text" name="ddns_url" class="form-control" value="{{ arg.ddns_url | e }}" placeholder="http://your-domain.com:8282 또는 http://192.168.0.10:8282">
+            <small class="form-text text-muted">KRadio 앱이 외부에서 접속할 N100 FlaskFarm 주소입니다.</small>
+          </div>
+        </div>
+        <div class="form-group row">
+          <label class="col-sm-2 col-form-label">API Key</label>
+          <div class="col-sm-10">
+            <input type="text" name="apikey" class="form-control" value="{{ arg.apikey | e }}">
+          </div>
+        </div>
+        <div class="form-group row">
+          <label class="col-sm-2 col-form-label">공식 channels.json URL</label>
+          <div class="col-sm-10">
+            <input type="text" name="upstream_url" class="form-control" value="{{ arg.upstream_url | e }}">
+            <small class="form-text text-muted">KRadio 공식 GitHub의 기본 채널 JSON 주소입니다.</small>
+          </div>
+        </div>
+        <div class="form-group row">
+          <label class="col-sm-2 col-form-label">티빙 API URL 템플릿</label>
+          <div class="col-sm-10">
+            <input type="text" name="tving_api_url" class="form-control" value="{{ arg.tving_api_url | e }}">
+            <small class="form-text text-muted">Alive 플러그인의 티빙 스트림 API 패턴입니다. ({id}, {apikey} 포함)</small>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary">설정 저장</button>
+        <span id="setting-msg" class="ml-2 font-weight-bold"></span>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: 채널 추가/수정 -->
+<div class="modal fade" id="modal-channel" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <form id="form-channel">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modal-title">방송 채널 추가</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>채널 ID <span class="text-danger">*</span></label>
+            <input type="text" name="id" id="ch-id" class="form-control" required placeholder="예: yonhapnewstv, ytn_tv">
+            <small class="form-text text-muted">영문/숫자로 된 고유 ID입니다.</small>
+          </div>
+          <div class="form-group">
+            <label>채널명 <span class="text-danger">*</span></label>
+            <input type="text" name="name" id="ch-name" class="form-control" required placeholder="예: 연합뉴스TV, YTN">
+          </div>
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <label>그룹</label>
+              <input type="text" name="group" id="ch-group" class="form-control" value="기타">
+            </div>
+            <div class="form-group col-md-6">
+              <label>삽입 위치 (특정 채널 뒤)</label>
+              <input type="text" name="insert_after" id="ch-insert-after" class="form-control" placeholder="예: ytn, kbs_1radio (비우면 맨 뒤)">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>방송 소스 형태</label>
+            <select name="source_type" id="ch-source-type" class="form-control">
+              <option value="tving">티빙 채널 ID (예: C01723 연합뉴스, C00593 YTN)</option>
+              <option value="direct">직접 스트림 주소 (m3u8 / http URL)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>소스 주소 또는 채널 ID <span class="text-danger">*</span></label>
+            <input type="text" name="source_val" id="ch-source-val" class="form-control" required placeholder="예: C01723 또는 https://...">
+          </div>
+          <div class="form-group">
+            <label>EPG ID (선택)</label>
+            <input type="text" name="epg" id="ch-epg" class="form-control" placeholder="예: 815508.naver (연합뉴스), 814912.naver (YTN)">
+            <small class="form-text text-muted">네이버 편성표 Service ID를 입력하면 앱에 실시간 프로그램명이 표시됩니다.</small>
+          </div>
+          <div class="form-group p-3 border rounded bg-light">
+            <div class="custom-control custom-switch">
+              <input type="checkbox" class="custom-control-input" id="ch-audio-extract" name="audio_extract" value="true" checked>
+              <label class="custom-control-label font-weight-bold" for="ch-audio-extract">실시간 음성만 변환 (On-Demand AAC)</label>
+            </div>
+            <small class="form-text text-muted mt-1">체크 시 KRadio에서 켤 때만 N100의 ffmpeg가 비디오를 제외하고 오디오만 실시간 복사 추출합니다. (TV 방송 청취 시 필수)</small>
+          </div>
+          <div class="form-group">
+            <label>로고 이미지 URL / 파일명 (선택)</label>
+            <input type="text" name="logo" id="ch-logo" class="form-control" placeholder="yonhapnewstv.png 또는 http://...">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">취소</button>
+          <button type="submit" class="btn btn-primary" id="btn-modal-save">저장</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function copyKRadioUrl() {
+  var copyText = document.getElementById("kradio-url");
+  copyText.select();
+  copyText.setSelectionRange(0, 99999);
+  navigator.clipboard.writeText(copyText.value).then(function() {
+    alert("KRadio 채널 설정 주소가 복사되었습니다!\n\n" + copyText.value);
+  });
+}
+
+function copyEpgUrl() {
+  var copyText = document.getElementById("epg-url");
+  copyText.select();
+  copyText.setSelectionRange(0, 99999);
+  navigator.clipboard.writeText(copyText.value).then(function() {
+    alert("통합 EPG XML 주소가 복사되었습니다!\n\n" + copyText.value);
+  });
+}
+
+$('#form-settings').on('submit', function(e) {
+  e.preventDefault();
+  $('#setting-msg').removeClass('text-danger text-success').text('저장 중...');
+  $.ajax({
+    url: '/ff_kradio/ajax/save_setting',
+    type: 'POST',
+    data: $(this).serialize(),
+    dataType: 'json'
+  }).done(function(res) {
+    if (res.ret === 'success') {
+      $('#setting-msg').addClass('text-success').text(res.message);
+      setTimeout(function(){ location.reload(); }, 800);
+    } else {
+      $('#setting-msg').addClass('text-danger').text(res.message);
+    }
+  }).fail(function() {
+    $('#setting-msg').addClass('text-danger').text('통신 오류 발생');
+  });
+});
+
+$('#btn-refresh-upstream').on('click', function() {
+  if (!confirm('공식 기본 채널을 다시 가져오시겠습니까?')) return;
+  $.ajax({
+    url: '/ff_kradio/ajax/refresh_upstream',
+    type: 'POST',
+    dataType: 'json'
+  }).done(function(res) {
+    alert(res.message || '갱신 완료');
+    location.reload();
+  });
+});
+
+$('#btn-refresh-epg').on('click', function() {
+  var btn = $(this);
+  btn.prop('disabled', true).text('갱신 중...');
+  $.ajax({
+    url: '/ff_kradio/ajax/refresh_epg',
+    type: 'POST',
+    dataType: 'json'
+  }).done(function(res) {
+    alert(res.message || 'EPG 갱신 완료');
+    btn.prop('disabled', false).text('EPG 즉시 갱신');
+  }).fail(function() {
+    alert('EPG 갱신 중 통신 오류가 발생했습니다.');
+    btn.prop('disabled', false).text('EPG 즉시 갱신');
+  });
+});
+
+$('#btn-add-channel').on('click', function() {
+  $('#modal-title').text('방송 채널 추가');
+  $('#ch-id').prop('readonly', false).val('');
+  $('#ch-name').val('');
+  $('#ch-group').val('기타');
+  $('#ch-insert-after').val('ytn');
+  $('#ch-source-type').val('tving');
+  $('#ch-source-val').val('');
+  $('#ch-epg').val('');
+  $('#ch-audio-extract').prop('checked', true);
+  $('#ch-logo').val('');
+  $('#modal-channel').modal('show');
+});
+
+$(document).on('click', '.btn-edit-ch', function() {
+  var tr = $(this).closest('tr');
+  var ch = tr.data('channel');
+  $('#modal-title').text('방송 채널 수정 (' + ch.id + ')');
+  $('#ch-id').prop('readonly', true).val(ch.id);
+  $('#ch-name').val(ch.name);
+  $('#ch-group').val(ch.group || '기타');
+  $('#ch-insert-after').val(ch.insert_after || '');
+  $('#ch-source-type').val(ch.source_type || 'tving');
+  $('#ch-source-val').val(ch.source_val || '');
+  $('#ch-epg').val(ch.epg || '');
+  $('#ch-audio-extract').prop('checked', ch.audio_extract !== false);
+  $('#ch-logo').val(ch.logo || '');
+  $('#modal-channel').modal('show');
+});
+
+$(document).on('click', '.btn-del-ch', function() {
+  var id = $(this).data('id');
+  if (!confirm('정말 [' + id + '] 채널을 삭제하시겠습니까?')) return;
+  $.ajax({
+    url: '/ff_kradio/ajax/delete_channel',
+    type: 'POST',
+    data: { id: id },
+    dataType: 'json'
+  }).done(function(res) {
+    if (res.ret === 'success') {
+      location.reload();
+    } else {
+      alert(res.message || '삭제 실패');
+    }
+  });
+});
+
+$('#form-channel').on('submit', function(e) {
+  e.preventDefault();
+  var data = {
+    id: $('#ch-id').val(),
+    name: $('#ch-name').val(),
+    group: $('#ch-group').val(),
+    insert_after: $('#ch-insert-after').val(),
+    source_type: $('#ch-source-type').val(),
+    source_val: $('#ch-source-val').val(),
+    epg: $('#ch-epg').val(),
+    audio_extract: $('#ch-audio-extract').is(':checked'),
+    logo: $('#ch-logo').val()
+  };
+
+  $.ajax({
+    url: '/ff_kradio/ajax/save_channel',
+    type: 'POST',
+    data: data,
+    dataType: 'json'
+  }).done(function(res) {
+    if (res.ret === 'success') {
+      $('#modal-channel').modal('hide');
+      location.reload();
+    } else {
+      alert(res.message || '저장 실패');
+    }
+  }).fail(function() {
+    alert('통신 오류가 발생했습니다.');
+  });
+});
+</script>
+{% endblock %}
