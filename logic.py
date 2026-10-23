@@ -42,6 +42,7 @@ DEFAULT_CUSTOM_CHANNELS = [
 ]
 
 _ENC_KEY = b"ff_kradio_2026_safe_key"
+DEFAULT_UPSTREAM_EPG_URL = "https://raw.githubusercontent.com/ohnggni/k_radio_android/epg/xmltv.xml"
 
 def _decrypt_payload(enc_str):
     try:
@@ -273,7 +274,7 @@ class Logic(PluginModuleBase):
                 logger.warning(f"[ff_kradio] xmltv 캐시 읽기 실패: {e}")
 
         upstream_content = ""
-        if os.path.exists(self.xmltv_upstream_path) and (now_ts - os.path.getmtime(self.xmltv_upstream_path) < 3600):
+        if not force and os.path.exists(self.xmltv_upstream_path) and (now_ts - os.path.getmtime(self.xmltv_upstream_path) < 3600 * 6):
             try:
                 with open(self.xmltv_upstream_path, "r", encoding="utf-8") as f:
                     upstream_content = f.read()
@@ -281,10 +282,10 @@ class Logic(PluginModuleBase):
                 pass
 
         if not upstream_content:
-            upstream_epg_url = (self.get_setting("upstream_epg_url") or "").strip()
+            upstream_epg_url = (self.get_setting("upstream_epg_url") or DEFAULT_UPSTREAM_EPG_URL).strip()
             try:
                 r = requests.get(upstream_epg_url, timeout=10)
-                if r.status_code == 200:
+                if r.status_code == 200 and "<tv" in r.text:
                     upstream_content = r.text
                     with open(self.xmltv_upstream_path, "w", encoding="utf-8") as f:
                         f.write(upstream_content)
