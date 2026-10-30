@@ -371,8 +371,14 @@ class Logic(PluginModuleBase):
         extra_programmes_xml = []
 
         for ch in custom_channels:
+            ch_id = ch.get("id", "")
             epg_id = (ch.get("epg") or "").strip()
-            ch_name = ch.get("name") or ch.get("id")
+            ch_name = ch.get("name") or ch_id
+            if not epg_id:
+                if ch_id == "sbs_gorilla" or "gorilla" in ch_id:
+                    epg_id = "sbs_gorilla"
+                elif ch_id == "mbc_allthat" or "allthat" in ch_id:
+                    epg_id = "mbc_allthat"
             if not epg_id:
                 continue
 
