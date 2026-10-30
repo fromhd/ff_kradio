@@ -395,8 +395,16 @@ class Logic(PluginModuleBase):
                     stream_url = source_val
 
             raw_logo = (ch.get("logo") or "").strip()
+            internal_logos = {
+                "kbs1.png", "kbs3.png", "kbs_classic.png", "kbs_cool.png", "kbs_happy.png",
+                "mbc_fm.png", "mbc_fm4u.png", "sbs_power.png", "sbs_love.png",
+                "cbs.png", "cbs_music.png", "ebs_fm.png", "tbs.png", "tbn.png",
+                "itv.png", "arirang.png", "ytn.png"
+            }
             if not raw_logo:
                 logo_url = f"{ddns}/ff_kradio/logo/{ch_id}.png"
+            elif raw_logo in internal_logos:
+                logo_url = raw_logo
             elif raw_logo.startswith("http://") or raw_logo.startswith("https://"):
                 logo_url = raw_logo
             else:
