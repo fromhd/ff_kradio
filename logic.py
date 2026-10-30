@@ -263,6 +263,77 @@ class Logic(PluginModuleBase):
         progs.sort(key=lambda x: x["dt"])
         return progs
 
+    def fetch_mbc_epg(self, channel_code="chm"):
+        """MBC 라디오(올댓뮤직 등) API에서 일일 편성표를 가져옵니다."""
+        url = f"https://control.imbc.com/Schedule/Radio?channel={channel_code}"
+        progs = []
+        try:
+            res = requests.get(url, timeout=5)
+            if res.status_code == 200:
+                items = res.json()
+                for item in items:
+                    bdate = (item.get("BroadDate") or "").replace("-", "")
+                    stime = (item.get("StartTime") or "").strip()
+                    etime = (item.get("EndTime") or "").strip()
+                    title = (item.get("Title") or "").strip()
+                    if not (bdate and stime and etime and title):
+                        continue
+                    try:
+                        s_dt = datetime.datetime.strptime(f"{bdate}{stime}00", "%Y%m%d%H%M%S")
+                        if etime == "2400":
+                            e_dt = datetime.datetime.strptime(f"{bdate}000000", "%Y%m%d%H%M%S") + datetime.timedelta(days=1)
+                        else:
+                            e_dt = datetime.datetime.strptime(f"{bdate}{etime}00", "%Y%m%d%H%M%S")
+                            if e_dt <= s_dt:
+                                e_dt += datetime.timedelta(days=1)
+                        progs.append({"start_dt": s_dt, "stop_dt": e_dt, "title": title})
+                    except Exception:
+                        pass
+        except Exception as e:
+            logger.warning(f"[ff_kradio] MBC EPG 가져오기 실패 ({channel_code}): {e}")
+        return progs
+
+    def fetch_sbs_onair_epg(self, channel_id="S19"):
+        """SBS 온에어 API에서 실시간 방송 정보를 가져와 당일 EPG로 구성합니다."""
+        url = "https://static.apis.sbs.co.kr/play-api/1.0/onair/channels"
+        progs = []
+        try:
+            res = requests.get(url, timeout=5)
+            if res.status_code == 200:
+                data = res.json()
+                for ch in data.get("list", []):
+                    if ch.get("channelid") == channel_id:
+                        title = (ch.get("title") or "").strip()
+                        stime = (ch.get("starttime") or "").replace(":", "").strip()
+                        etime = (ch.get("endtime") or "").replace(":", "").strip()
+                        if not title:
+                            continue
+                        now = datetime.datetime.now()
+                        today_str = now.strftime("%Y%m%d")
+                        try:
+                            if stime == "2400":
+                                s_dt = datetime.datetime.strptime(f"{today_str}000000", "%Y%m%d%H%M%S")
+                            else:
+                                s_dt = datetime.datetime.strptime(f"{today_str}{stime.zfill(4)}00", "%Y%m%d%H%M%S")
+                            if etime == "2400":
+                                e_dt = datetime.datetime.strptime(f"{today_str}000000", "%Y%m%d%H%M%S") + datetime.timedelta(days=1)
+                            else:
+                                e_dt = datetime.datetime.strptime(f"{today_str}{etime.zfill(4)}00", "%Y%m%d%H%M%S")
+                                if e_dt <= s_dt:
+                                    e_dt += datetime.timedelta(days=1)
+                            if now < s_dt and (s_dt - now).total_seconds() > 43200:
+                                s_dt -= datetime.timedelta(days=1)
+                                e_dt -= datetime.timedelta(days=1)
+                            progs.append({"start_dt": s_dt, "stop_dt": e_dt, "title": title})
+                        except Exception:
+                            s_dt = now.replace(minute=0, second=0, microsecond=0)
+                            e_dt = s_dt + datetime.timedelta(hours=1)
+                            progs.append({"start_dt": s_dt, "stop_dt": e_dt, "title": title})
+                        break
+        except Exception as e:
+            logger.warning(f"[ff_kradio] SBS 온에어 EPG 가져오기 실패 ({channel_id}): {e}")
+        return progs
+
     def get_merged_xmltv(self, force=False):
         """기본 upstream XMLTV와 커스텀 채널(네이버 EPG)을 합친 XML을 반환합니다."""
         now_ts = time.time()
@@ -325,6 +396,30 @@ class Logic(PluginModuleBase):
                             stop_str = (p["dt"] + datetime.timedelta(hours=1)).strftime("%Y%m%d%H%M%S +0900")
                         title_esc = escape(p["title"])
                         extra_programmes_xml.append(f'  <programme start="{start_str}" stop="{stop_str}" channel="{escape(epg_id)}">\n    <title lang="ko">{title_esc}</title>\n  </programme>')
+            elif epg_id.endswith(".mbc") or epg_id == "mbc_allthat" or "allthat" in epg_id.lower():
+                ch_code = "chm"
+                if epg_id.endswith(".mbc"):
+                    ch_code = epg_id[:-4]
+                progs = self.fetch_mbc_epg(ch_code)
+                if progs:
+                    extra_channels_xml.append(f'  <channel id="{escape(epg_id)}">\n    <display-name>{escape(ch_name)}</display-name>\n  </channel>')
+                    for p in progs:
+                        start_str = p["start_dt"].strftime("%Y%m%d%H%M%S +0900")
+                        stop_str = p["stop_dt"].strftime("%Y%m%d%H%M%S +0900")
+                        title_esc = escape(p["title"])
+                        extra_programmes_xml.append(f'  <programme start="{start_str}" stop="{stop_str}" channel="{escape(epg_id)}">\n    <title lang="ko">{title_esc}</title>\n  </programme>')
+            elif epg_id.endswith(".sbs") or epg_id == "sbs_gorilla" or "gorilla" in epg_id.lower() or "gorealra" in epg_id.lower():
+                ch_code = "S19"
+                if epg_id.endswith(".sbs"):
+                    ch_code = epg_id[:-4]
+                progs = self.fetch_sbs_onair_epg(ch_code)
+                if progs:
+                    extra_channels_xml.append(f'  <channel id="{escape(epg_id)}">\n    <display-name>{escape(ch_name)}</display-name>\n  </channel>')
+                    for p in progs:
+                        start_str = p["start_dt"].strftime("%Y%m%d%H%M%S +0900")
+                        stop_str = p["stop_dt"].strftime("%Y%m%d%H%M%S +0900")
+                        title_esc = escape(p["title"])
+                        extra_programmes_xml.append(f'  <programme start="{start_str}" stop="{stop_str}" channel="{escape(epg_id)}">\n    <title lang="ko">{title_esc}</title>\n  </programme>')
 
         if extra_channels_xml or extra_programmes_xml:
             injection = "\n" + "\n".join(extra_channels_xml) + "\n" + "\n".join(extra_programmes_xml) + "\n"
@@ -379,6 +474,10 @@ class Logic(PluginModuleBase):
                 epg_val = "815508.naver"
             elif not epg_val and ch_id == "ytn_tv":
                 epg_val = "814912.naver"
+            elif not epg_val and (ch_id == "sbs_gorilla" or "gorilla" in ch_id):
+                epg_val = "sbs_gorilla"
+            elif not epg_val and (ch_id == "mbc_allthat" or "allthat" in ch_id):
+                epg_val = "mbc_allthat"
 
             audio_extract = ch.get("audio_extract", True)
             source_val = (ch.get("source_val") or "").strip()
@@ -391,10 +490,18 @@ class Logic(PluginModuleBase):
                     stream_url = source_val
                 elif source_val.startswith("C0") or source_type == "tving":
                     stream_url = f"http://127.0.0.1:8282/alive/api/url.m3u8?m=url&s=tving&i={source_val}&apikey={apikey}"
+                elif "/" in source_val:
+                    s, i = source_val.split("/", 1)
+                    stream_url = f"http://127.0.0.1:8282/alive/api/url.m3u8?m=url&s={s}&i={i}&apikey={apikey}"
                 else:
                     stream_url = source_val
 
             raw_logo = (ch.get("logo") or "").strip()
+            if not raw_logo:
+                if ch_id == "sbs_gorilla" or "gorilla" in ch_id:
+                    raw_logo = "sbs_gorilla.png"
+                elif ch_id == "mbc_allthat" or "allthat" in ch_id:
+                    raw_logo = "mbc_allthat.png"
             internal_logos = {
                 "kbs1.png", "kbs3.png", "kbs_classic.png", "kbs_cool.png", "kbs_happy.png",
                 "mbc_fm.png", "mbc_fm4u.png", "sbs_power.png", "sbs_love.png",
@@ -623,6 +730,9 @@ class Logic(PluginModuleBase):
                 target_url = source_val
             elif source_val.startswith("C0") or source_type == "tving":
                 target_url = f"http://127.0.0.1:8282/alive/api/url.m3u8?m=url&s=tving&i={source_val}&apikey={apikey}"
+            elif "/" in source_val:
+                s, i = source_val.split("/", 1)
+                target_url = f"http://127.0.0.1:8282/alive/api/url.m3u8?m=url&s={s}&i={i}&apikey={apikey}"
             else:
                 target_url = source_val
 
