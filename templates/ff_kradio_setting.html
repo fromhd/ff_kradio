@@ -176,10 +176,17 @@
           </div>
         </div>
         <div class="form-group row">
+          <label class="col-sm-2 col-form-label font-weight-bold">YouTube 쿠키 / 프로필</label>
+          <div class="col-sm-10">
+            <input type="text" name="youtube_cookies" class="form-control" value="{{ arg.youtube_cookies | e }}" placeholder="예: firefox:/volume1/docker/firefox/.config/mozilla/firefox/rs8r0p5m.default-release (비워두면 자동 감지)">
+            <small class="form-text text-muted">비워두면 시스템의 Firefox 프로필(/volume1/docker/firefox) 또는 cookies.txt를 자동 감지하여 봇 인증 없이 YouTube 음성을 직접 추출합니다.</small>
+          </div>
+        </div>
+        <div class="form-group row">
           <label class="col-sm-2 col-form-label">프록시 URL (선택)</label>
           <div class="col-sm-10">
-            <input type="text" name="proxy_url" class="form-control" value="{{ arg.proxy_url | e }}" placeholder="예: http://fromhd:1030@nowzz.pp.ua:925 또는 socks5://...">
-            <small class="form-text text-muted">해외 VPS(도쿄 등)에서 유튜브 라이브 봇 차단 우회 또는 프록시 경유 시 설정합니다.</small>
+            <input type="text" name="proxy_url" class="form-control" value="{{ arg.proxy_url | e }}" placeholder="비워두면 프록시 없이 직접 접속 (쿠키 사용 시 프록시 불필요)">
+            <small class="form-text text-muted">쿠키가 없는 환경 등에서 특정 프록시를 경유해야 할 때만 입력합니다. (일반적으로 비워둡니다)</small>
           </div>
         </div>
         <button type="submit" class="btn btn-primary">설정 저장</button>

@@ -2,6 +2,7 @@ import copy
 import datetime
 import json
 import os
+import glob
 import re
 import subprocess
 import time
@@ -87,8 +88,39 @@ class Logic(PluginModuleBase):
         if cached and (now_ts - cached.get("ts", 0) < 3600):
             return cached.get("stream_url")
 
+        # 1. Node.js 런타임 감지 (JS challenge solver용)
+        node_path = None
+        for p in ["/usr/bin/node", "/usr/local/bin/node", "/host/usr/bin/node", "/host/usr/local/bin/node"]:
+            if os.path.isfile(p) and os.access(p, os.X_OK):
+                node_path = p
+                break
+
+        # 2. 쿠키 및 브라우저 프로필 감지
+        cookies_spec = (self.get_setting("youtube_cookies") or "").strip()
+        if not cookies_spec:
+            # Firefox 프로필 자동 감지
+            ff_profiles = glob.glob("/volume1/docker/firefox/.config/mozilla/firefox/*.default-release")
+            if not ff_profiles:
+                ff_profiles = glob.glob("/volume1/docker/firefox/.config/mozilla/firefox/*.default*")
+            if ff_profiles:
+                cookies_spec = f"firefox:{ff_profiles[0]}"
+            elif os.path.isfile("/volume1/downloads/yt-dlp/cookies.txt"):
+                cookies_spec = "/volume1/downloads/yt-dlp/cookies.txt"
+            elif os.path.isfile("/data/cookies.txt"):
+                cookies_spec = "/data/cookies.txt"
+
         proxy = (self.get_setting("proxy_url") or "").strip()
         cmd = ["yt-dlp", "-g", "-f", "bestaudio/best"]
+        if node_path:
+            cmd.extend(["--remote-components", "ejs:github", "--js-runtimes", f"node:{node_path}"])
+        if cookies_spec:
+            if cookies_spec.startswith("firefox:") or cookies_spec.startswith("chrome:") or cookies_spec.startswith("edge:"):
+                cmd.extend(["--cookies-from-browser", cookies_spec])
+            elif os.path.isdir(cookies_spec):
+                cmd.extend(["--cookies-from-browser", f"firefox:{cookies_spec}"])
+            elif os.path.isfile(cookies_spec):
+                cmd.extend(["--cookies", cookies_spec])
+
         if proxy:
             cmd.extend(["--proxy", proxy])
 
@@ -101,7 +133,7 @@ class Logic(PluginModuleBase):
 
         cmd.append(full_target)
         try:
-            logger.info(f"[ff_kradio] yt-dlp 주소 추출 시도: {full_target} (proxy: {'ON' if proxy else 'OFF'})")
+            logger.info(f"[ff_kradio] yt-dlp 주소 추출 시도: {full_target} (cookies: {cookies_spec or 'NONE'}, proxy: {'ON' if proxy else 'OFF'})")
             res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=20)
             if res.returncode == 0:
                 lines = [l.strip() for l in res.stdout.strip().splitlines() if l.strip().startswith("http")]
@@ -119,6 +151,8 @@ class Logic(PluginModuleBase):
         "upstream_url": "",
         "ddns_url": "",
         "apikey": "",
+        "proxy_url": "",
+        "youtube_cookies": "",
         "custom_channels_json": json.dumps(DEFAULT_CUSTOM_CHANNELS, ensure_ascii=False),
         "use_raw_override": "False",
         "raw_json_override": ""
@@ -613,6 +647,7 @@ class Logic(PluginModuleBase):
             "ddns_url": self.get_setting("ddns_url"),
             "apikey": self.get_setting("apikey"),
             "proxy_url": self.get_setting("proxy_url") or "",
+            "youtube_cookies": self.get_setting("youtube_cookies") or "",
             "channels_url": channels_url,
             "epg_url": epg_url,
             "base_channels": self.get_base_channels(),
@@ -637,6 +672,7 @@ class Logic(PluginModuleBase):
                 ModelSetting.set("ddns_url", req.form.get("ddns_url", "").strip())
                 ModelSetting.set("apikey", req.form.get("apikey", "").strip())
                 ModelSetting.set("proxy_url", req.form.get("proxy_url", "").strip())
+                ModelSetting.set("youtube_cookies", req.form.get("youtube_cookies", "").strip())
                 return jsonify({"ret": "success", "message": "설정이 저장되었습니다."})
 
             elif sub == "toggle_base_channel":
