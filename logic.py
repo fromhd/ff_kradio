@@ -132,7 +132,12 @@ class Logic(PluginModuleBase):
                 cookies_spec = "/data/cookies.txt"
 
         proxy = (self.get_setting("proxy_url") or "").strip()
-        cmd = ["yt-dlp", "-g", "-f", "bestaudio/best"]
+        cmd = [
+            "yt-dlp",
+            "-g",
+            "-f", "bestaudio/best",
+            "--extractor-args", "youtube:player_client=mweb,web"
+        ]
         if node_path:
             cmd.extend(["--remote-components", "ejs:github", "--js-runtimes", f"node:{node_path}"])
         if cookies_spec:
