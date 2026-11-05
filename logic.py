@@ -48,7 +48,7 @@ DEFAULT_CUSTOM_CHANNELS = [
         "source_type": "youtube",
         "source_val": "https://www.youtube.com/@NHKWORLDJAPAN/live",
         "audio_extract": True,
-        "logo": "nhk_world.png",
+        "logo": "nhk_world_v2.png",
         "epg": "nhk_world"
     },
     {
