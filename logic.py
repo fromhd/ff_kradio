@@ -49,7 +49,7 @@ DEFAULT_CUSTOM_CHANNELS = [
         "source_val": "https://www.youtube.com/@NHKWORLDJAPAN/live",
         "audio_extract": True,
         "logo": "nhk_world.png",
-        "epg": ""
+        "epg": "nhk_world"
     },
     {
         "id": "cna_news",
@@ -60,7 +60,7 @@ DEFAULT_CUSTOM_CHANNELS = [
         "source_val": "https://www.youtube.com/@channelnewsasia/live",
         "audio_extract": True,
         "logo": "cna.png",
-        "epg": ""
+        "epg": "cna_news"
     }
 ]
 
@@ -449,6 +449,66 @@ class Logic(PluginModuleBase):
             logger.warning(f"[ff_kradio] SBS 온에어 EPG 가져오기 실패 ({channel_id}): {e}")
         return progs
 
+    def fetch_nhk_world_epg(self):
+        """NHK World-Japan 공식 EPG JSON API에서 3일간의 편성표를 가져옵니다."""
+        progs = []
+        now = datetime.datetime.now()
+        dates = [(now + datetime.timedelta(days=i)).strftime('%Y%m%d') for i in (-1, 0, 1)]
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        for d in dates:
+            url = f"https://masterpl.hls.nhkworld.jp/epg/w/{d}.json"
+            try:
+                r = requests.get(url, headers=headers, timeout=5)
+                if r.status_code == 200:
+                    data = r.json()
+                    for item in data.get("data", []):
+                        s_str = item.get("startTime")
+                        e_str = item.get("endTime")
+                        title = item.get("title") or ""
+                        sub = item.get("episodeTitle") or ""
+                        if sub and sub != title:
+                            title = f"{title} - {sub}"
+                        desc = item.get("description") or ""
+                        if s_str and e_str and title:
+                            s_dt = datetime.datetime.fromisoformat(s_str)
+                            e_dt = datetime.datetime.fromisoformat(e_str)
+                            progs.append({"start_dt": s_dt, "stop_dt": e_dt, "title": title, "desc": desc})
+            except Exception as e:
+                logger.warning(f"[ff_kradio] NHK World EPG 가져오기 실패 ({d}): {e}")
+        progs.sort(key=lambda x: x["start_dt"])
+        return progs
+
+    def fetch_cna_epg(self):
+        """CNA (Channel NewsAsia) 공식 싱가포르 API에서 이틀간의 편성표를 가져옵니다."""
+        progs = []
+        now = datetime.datetime.now(datetime.timezone.utc)
+        dates = [(now + datetime.timedelta(days=i)).strftime('%Y-%m-%d') for i in (0, 1)]
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        for d in dates:
+            url = f"https://cdn.mewatch.sg/api/schedules?channels=97072&date={d}&duration=24&ff=idp,ldp,rpt,cd&hour=0&intersect=true&lang=en&segments=all"
+            try:
+                r = requests.get(url, headers=headers, timeout=5)
+                if r.status_code == 200:
+                    data = r.json()
+                    schedules = data[0].get("schedules", []) if data and isinstance(data, list) else []
+                    for s in schedules:
+                        s_str = s.get("startDate")
+                        e_str = s.get("endDate")
+                        item = s.get("item", {})
+                        title = item.get("title") or ""
+                        sub = item.get("episodeTitle") or ""
+                        if sub and sub != title and f" - {sub}" not in title:
+                            title = f"{title} - {sub}"
+                        desc = item.get("description") or ""
+                        if s_str and e_str and title:
+                            s_dt = datetime.datetime.fromisoformat(s_str.replace("Z", "+00:00"))
+                            e_dt = datetime.datetime.fromisoformat(e_str.replace("Z", "+00:00"))
+                            progs.append({"start_dt": s_dt, "stop_dt": e_dt, "title": title, "desc": desc})
+            except Exception as e:
+                logger.warning(f"[ff_kradio] CNA EPG 가져오기 실패 ({d}): {e}")
+        progs.sort(key=lambda x: x["start_dt"])
+        return progs
+
     def get_merged_xmltv(self, force=False):
         """기본 upstream XMLTV와 커스텀 채널(네이버 EPG)을 합친 XML을 반환합니다."""
         now_ts = time.time()
@@ -494,6 +554,10 @@ class Logic(PluginModuleBase):
                     epg_id = "sbs_gorilla"
                 elif ch_id == "mbc_allthat" or "allthat" in ch_id:
                     epg_id = "mbc_allthat"
+                elif ch_id == "nhk_world" or "nhk" in ch_id.lower():
+                    epg_id = "nhk_world"
+                elif ch_id == "cna_news" or "cna" in ch_id.lower():
+                    epg_id = "cna_news"
             if not epg_id:
                 continue
 
@@ -541,6 +605,32 @@ class Logic(PluginModuleBase):
                         stop_str = p["stop_dt"].strftime("%Y%m%d%H%M%S +0900")
                         title_esc = escape(p["title"])
                         extra_programmes_xml.append(f'  <programme start="{start_str}" stop="{stop_str}" channel="{escape(epg_id)}">\n    <title lang="ko">{title_esc}</title>\n  </programme>')
+            elif "nhk" in epg_id.lower() or "nhk" in ch_id.lower():
+                progs = self.fetch_nhk_world_epg()
+                if progs:
+                    extra_channels_xml.append(f'  <channel id="{escape(epg_id)}">\n    <display-name>{escape(ch_name)}</display-name>\n  </channel>')
+                    kst = datetime.timezone(datetime.timedelta(hours=9))
+                    for p in progs:
+                        s_kst = p["start_dt"].astimezone(kst) if p["start_dt"].tzinfo else p["start_dt"]
+                        e_kst = p["stop_dt"].astimezone(kst) if p["stop_dt"].tzinfo else p["stop_dt"]
+                        start_str = s_kst.strftime("%Y%m%d%H%M%S +0900")
+                        stop_str = e_kst.strftime("%Y%m%d%H%M%S +0900")
+                        title_esc = escape(p["title"])
+                        desc_esc = escape(p.get("desc") or "")
+                        extra_programmes_xml.append(f'  <programme start="{start_str}" stop="{stop_str}" channel="{escape(epg_id)}">\n    <title lang="en">{title_esc}</title>\n    <desc lang="en">{desc_esc}</desc>\n  </programme>')
+            elif "cna" in epg_id.lower() or "cna" in ch_id.lower():
+                progs = self.fetch_cna_epg()
+                if progs:
+                    extra_channels_xml.append(f'  <channel id="{escape(epg_id)}">\n    <display-name>{escape(ch_name)}</display-name>\n  </channel>')
+                    kst = datetime.timezone(datetime.timedelta(hours=9))
+                    for p in progs:
+                        s_kst = p["start_dt"].astimezone(kst) if p["start_dt"].tzinfo else p["start_dt"]
+                        e_kst = p["stop_dt"].astimezone(kst) if p["stop_dt"].tzinfo else p["stop_dt"]
+                        start_str = s_kst.strftime("%Y%m%d%H%M%S +0900")
+                        stop_str = e_kst.strftime("%Y%m%d%H%M%S +0900")
+                        title_esc = escape(p["title"])
+                        desc_esc = escape(p.get("desc") or "")
+                        extra_programmes_xml.append(f'  <programme start="{start_str}" stop="{stop_str}" channel="{escape(epg_id)}">\n    <title lang="en">{title_esc}</title>\n    <desc lang="en">{desc_esc}</desc>\n  </programme>')
 
         if extra_channels_xml or extra_programmes_xml:
             injection = "\n" + "\n".join(extra_channels_xml) + "\n" + "\n".join(extra_programmes_xml) + "\n"
