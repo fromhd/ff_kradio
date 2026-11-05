@@ -39,6 +39,28 @@ DEFAULT_CUSTOM_CHANNELS = [
         "audio_extract": True,
         "logo": "ytn.png",
         "epg": "814912.naver"
+    },
+    {
+        "id": "nhk_world",
+        "name": "NHK 월드 재팬",
+        "group": "영어",
+        "type": "direct",
+        "source_type": "youtube",
+        "source_val": "https://www.youtube.com/@NHKWORLDJAPAN/live",
+        "audio_extract": True,
+        "logo": "nhk_world.png",
+        "epg": ""
+    },
+    {
+        "id": "cna_news",
+        "name": "CNA 뉴스",
+        "group": "영어",
+        "type": "direct",
+        "source_type": "youtube",
+        "source_val": "https://www.youtube.com/@channelnewsasia/live",
+        "audio_extract": True,
+        "logo": "cna.png",
+        "epg": ""
     }
 ]
 
