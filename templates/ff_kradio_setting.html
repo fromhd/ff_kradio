@@ -131,7 +131,9 @@
               </td>
               <td><small class="text-break">{{ ch.source_val }}</small></td>
               <td class="text-center">
-                {% if ch.audio_extract %}
+                {% if ch.source_type == 'youtube' or 'youtube.com' in ch.source_val or 'youtu.be' in ch.source_val or ch.source_val.startswith('@') %}
+                  <span class="badge badge-danger">YouTube 음성</span>
+                {% elif ch.audio_extract %}
                   <span class="badge badge-success">AAC 변환 ON</span>
                 {% else %}
                   <span class="badge badge-light border">직접 재생</span>
@@ -173,6 +175,13 @@
             <input type="text" name="apikey" class="form-control" value="{{ arg.apikey | e }}">
           </div>
         </div>
+        <div class="form-group row">
+          <label class="col-sm-2 col-form-label">프록시 URL (선택)</label>
+          <div class="col-sm-10">
+            <input type="text" name="proxy_url" class="form-control" value="{{ arg.proxy_url | e }}" placeholder="예: http://fromhd:1030@nowzz.pp.ua:925 또는 socks5://...">
+            <small class="form-text text-muted">해외 VPS(도쿄 등)에서 유튜브 라이브 봇 차단 우회 또는 프록시 경유 시 설정합니다.</small>
+          </div>
+        </div>
         <button type="submit" class="btn btn-primary">설정 저장</button>
         <span id="setting-msg" class="ml-2 font-weight-bold"></span>
       </form>
@@ -207,9 +216,18 @@
             <input type="text" name="group" id="ch-group" class="form-control" value="TV">
           </div>
           <div class="form-group">
-            <label>방송 스트림 주소 (m3u8 URL 또는 채널 ID) <span class="text-danger">*</span></label>
-            <input type="text" name="source_val" id="ch-source-val" class="form-control" required placeholder="예: Alive에서 [클립보드 복사]한 m3u8 주소, 무료 m3u8 주소, 또는 C01723">
-            <small class="form-text text-muted">Alive 플러그인(티빙, 웨이브, MBC 등)에서 복사한 실시간 m3u8 주소나 인터넷 m3u8 주소를 그대로 붙여넣으세요.</small>
+            <label>방송 소스 종류</label>
+            <select name="source_type" id="ch-source-type" class="form-control">
+              <option value="direct">직접 스트림 (HLS / m3u8)</option>
+              <option value="youtube">유튜브 (라이브 / 동영상)</option>
+              <option value="tving">티빙 채널코드 (C0xxxx)</option>
+              <option value="alive">Alive 채널 (sbs/S19 등)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>방송 스트림 주소 (URL 또는 유튜브 링크/채널ID) <span class="text-danger">*</span></label>
+            <input type="text" name="source_val" id="ch-source-val" class="form-control" required placeholder="예: https://www.youtube.com/@yonhapnewstv23/live, @ytnnews24/live, m3u8 주소">
+            <small class="form-text text-muted">유튜브 채널 핸들/영상 링크, Alive 플러그인에서 복사한 m3u8 주소, 또는 일반 스트림 주소를 입력하세요.</small>
           </div>
           <div class="form-group">
             <label>EPG ID (선택)</label>
@@ -318,6 +336,7 @@ $('#btn-add-channel').on('click', function() {
   $('#ch-id').prop('readonly', false).val('');
   $('#ch-name').val('');
   $('#ch-group').val('TV');
+  $('#ch-source-type').val('direct');
   $('#ch-source-val').val('');
   $('#ch-epg').val('');
   $('#ch-audio-extract').prop('checked', true);
@@ -333,6 +352,7 @@ $(document).on('click', '.btn-edit-ch', function() {
   $('#ch-id').prop('readonly', false).val(ch.id);
   $('#ch-name').val(ch.name);
   $('#ch-group').val(ch.group || 'TV');
+  $('#ch-source-type').val(ch.source_type || 'direct');
   $('#ch-source-val').val(ch.source_val || '');
   $('#ch-epg').val(ch.epg || '');
   $('#ch-audio-extract').prop('checked', ch.audio_extract !== false);

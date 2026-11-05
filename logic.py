@@ -20,10 +20,10 @@ DEFAULT_CUSTOM_CHANNELS = [
     {
         "id": "yonhapnewstv",
         "name": "연합뉴스TV",
-        "group": "기타",
+        "group": "TV",
         "type": "direct",
-        "source_type": "tving",
-        "source_val": "C01723",
+        "source_type": "youtube",
+        "source_val": "https://www.youtube.com/@yonhapnewstv23/live",
         "audio_extract": True,
         "logo": "yonhapnewstv.png",
         "epg": "815508.naver"
@@ -31,10 +31,10 @@ DEFAULT_CUSTOM_CHANNELS = [
     {
         "id": "ytn_tv",
         "name": "YTN",
-        "group": "기타",
+        "group": "TV",
         "type": "direct",
-        "source_type": "tving",
-        "source_val": "C00593",
+        "source_type": "youtube",
+        "source_val": "https://www.youtube.com/@ytnnews24/live",
         "audio_extract": True,
         "logo": "ytn.png",
         "epg": "814912.naver"
@@ -56,6 +56,65 @@ def _decrypt_payload(enc_str):
         return None
 
 class Logic(PluginModuleBase):
+    _yt_cache = {}
+
+    @classmethod
+    def plugin_load(cls):
+        try:
+            res = subprocess.run(["yt-dlp", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if res.returncode != 0:
+                raise FileNotFoundError
+        except Exception:
+            logger.info("[ff_kradio] yt-dlp 패키지가 없어 자동 설치를 시도합니다...")
+            try:
+                subprocess.run([sys.executable, "-m", "pip", "install", "-U", "yt-dlp"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+                logger.info("[ff_kradio] yt-dlp 자동 설치 완료!")
+            except Exception as e:
+                logger.warning(f"[ff_kradio] yt-dlp 자동 설치 실패: {e}")
+
+    def is_youtube_source(self, source_type, source_val):
+        st = (source_type or "").lower().strip()
+        sv = (source_val or "").strip()
+        if st in ("youtube", "yt"):
+            return True
+        if "youtube.com" in sv or "youtu.be" in sv or sv.startswith("@"):
+            return True
+        return False
+
+    def resolve_youtube_stream_url(self, target):
+        now_ts = time.time()
+        cached = self._yt_cache.get(target)
+        if cached and (now_ts - cached.get("ts", 0) < 3600):
+            return cached.get("stream_url")
+
+        proxy = (self.get_setting("proxy_url") or "").strip()
+        cmd = ["yt-dlp", "-g", "-f", "bestaudio/best"]
+        if proxy:
+            cmd.extend(["--proxy", proxy])
+
+        full_target = target.strip()
+        if not full_target.startswith("http://") and not full_target.startswith("https://"):
+            if full_target.startswith("@"):
+                full_target = f"https://www.youtube.com/{full_target}"
+            else:
+                full_target = f"https://www.youtube.com/watch?v={full_target}"
+
+        cmd.append(full_target)
+        try:
+            logger.info(f"[ff_kradio] yt-dlp 주소 추출 시도: {full_target} (proxy: {'ON' if proxy else 'OFF'})")
+            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=20)
+            if res.returncode == 0:
+                lines = [l.strip() for l in res.stdout.strip().splitlines() if l.strip().startswith("http")]
+                if lines:
+                    stream_url = lines[0]
+                    self._yt_cache[target] = {"stream_url": stream_url, "ts": now_ts}
+                    logger.info(f"[ff_kradio] yt-dlp 주소 추출 성공: {target}")
+                    return stream_url
+            logger.error(f"[ff_kradio] yt-dlp 추출 에러 ({target}): {res.stderr}")
+        except Exception as e:
+            logger.error(f"[ff_kradio] yt-dlp 실행 예외 ({target}): {e}")
+        return None
+
     db_default = {
         "upstream_url": "",
         "ddns_url": "",
@@ -485,11 +544,12 @@ class Logic(PluginModuleBase):
             elif not epg_val and (ch_id == "mbc_allthat" or "allthat" in ch_id):
                 epg_val = "mbc_allthat"
 
-            audio_extract = ch.get("audio_extract", True)
             source_val = (ch.get("source_val") or "").strip()
             source_type = ch.get("source_type", "direct")
+            audio_extract = ch.get("audio_extract", True)
+            is_yt = self.is_youtube_source(source_type, source_val)
 
-            if audio_extract:
+            if audio_extract or is_yt:
                 stream_url = f"{ddns}/ff_kradio/audio/{ch_id}"
             else:
                 if source_val.startswith("http://") or source_val.startswith("https://"):
@@ -552,6 +612,7 @@ class Logic(PluginModuleBase):
             "upstream_url": self.get_setting("upstream_url"),
             "ddns_url": self.get_setting("ddns_url"),
             "apikey": self.get_setting("apikey"),
+            "proxy_url": self.get_setting("proxy_url") or "",
             "channels_url": channels_url,
             "epg_url": epg_url,
             "base_channels": self.get_base_channels(),
@@ -575,6 +636,7 @@ class Logic(PluginModuleBase):
                 ModelSetting.set("upstream_url", req.form.get("upstream_url", "").strip())
                 ModelSetting.set("ddns_url", req.form.get("ddns_url", "").strip())
                 ModelSetting.set("apikey", req.form.get("apikey", "").strip())
+                ModelSetting.set("proxy_url", req.form.get("proxy_url", "").strip())
                 return jsonify({"ret": "success", "message": "설정이 저장되었습니다."})
 
             elif sub == "toggle_base_channel":
@@ -619,6 +681,10 @@ class Logic(PluginModuleBase):
 
                 if not ch_id or not name:
                     return jsonify({"ret": "error", "message": "채널 ID와 채널명을 입력해주세요."})
+
+                if self.is_youtube_source(source_type, source_val):
+                    source_type = "youtube"
+                    audio_extract = True
 
                 channels = self.get_custom_channels()
                 updated = False
@@ -732,7 +798,14 @@ class Logic(PluginModuleBase):
 
             apikey = self.get_setting("apikey") or ""
 
-            if source_val.startswith("http://") or source_val.startswith("https://"):
+            is_yt = self.is_youtube_source(source_type, source_val)
+            proxy_url = (self.get_setting("proxy_url") or "").strip()
+
+            if is_yt:
+                target_url = self.resolve_youtube_stream_url(source_val)
+                if not target_url:
+                    return Response("유튜브 오디오 스트림 주소를 추출하지 못했습니다.", status=502, mimetype="text/plain; charset=utf-8")
+            elif source_val.startswith("http://") or source_val.startswith("https://"):
                 target_url = source_val
             elif source_val.startswith("C0") or source_type == "tving":
                 target_url = f"http://127.0.0.1:8282/alive/api/url.m3u8?m=url&s=tving&i={source_val}&apikey={apikey}"
@@ -742,18 +815,31 @@ class Logic(PluginModuleBase):
             else:
                 target_url = source_val
 
-            logger.info(f"[ff_kradio] ffmpeg 오디오 스트리밍 시작: ch_id={ch_id}, target={target_url}")
+            logger.info(f"[ff_kradio] ffmpeg 오디오 스트리밍 시작: ch_id={ch_id}, is_yt={is_yt}, target={target_url[:80] if target_url else ''}")
 
             cmd = [
                 "ffmpeg",
                 "-loglevel", "error",
                 "-re",
+            ]
+            if is_yt and proxy_url:
+                cmd.extend(["-http_proxy", proxy_url])
+
+            cmd.extend([
                 "-i", target_url,
                 "-vn",
-                "-c:a", "copy",
+            ])
+
+            # HLS/m3u8 스트림은 AAC 직접 복사, 그 외 WebM/Opus 등은 AAC 인코딩
+            if target_url and ".m3u8" in target_url:
+                cmd.extend(["-c:a", "copy"])
+            else:
+                cmd.extend(["-c:a", "aac", "-b:a", "128k"])
+
+            cmd.extend([
                 "-f", "adts",
                 "pipe:1"
-            ]
+            ])
 
             def generate():
                 proc = subprocess.Popen(
